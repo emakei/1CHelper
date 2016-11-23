@@ -516,7 +516,7 @@ function Get-NetHaspIniStrings
         
         $content = Get-Content -Encoding UTF8 -LiteralPath $pathToFile
         $strings = $content | ? { $_ -match "^\w" }
-        $strings | % { $keyValue = $_.Split('='); $key = $keyValue[0].Replace(" ",""); $value = $keyValue[1].Replace(" ",""); $struct[$key] = $value.Split(',') }
+        $strings | % { $keyValue = $_.Split('='); $key = $keyValue[0].Replace(" ",""); $value = $keyValue[1].Replace(" ",""); $value = $value.Replace(';',''); $struct[$key] = $value.Split(',') }
 
     }
 

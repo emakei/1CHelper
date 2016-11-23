@@ -511,6 +511,7 @@ function Get-NetHaspIniStrings
     $struct = @{}
     
     $pathToStarter = Find-1CEstart
+    $pathToFile = $pathToStarter.Replace("common\1cestart.exe", "conf\nethasp.ini")
 
     if ( $pathToStarter ) {
         

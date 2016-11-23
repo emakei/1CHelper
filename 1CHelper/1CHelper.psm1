@@ -601,3 +601,34 @@ function Find-1CApplicationForExportImport
      }
      $installationPath
 }
+
+function Get-NetHaspDirectoryPath
+<#
+.Synopsis
+   Возвращает путь к каталогу с библиотекой hsmon.dll
+.DESCRIPTION
+   
+.EXAMPLE
+   Get-NetHaspDirectoryPath
+.OUTPUTS
+   Путь к каталогу с библиотекой hsmon.dll
+#>
+{  
+    (Get-Module 1CHelper).Path.Replace("1CHelper.psm1", "nethasp")
+}
+
+function Get-NetHaspIniFilePath
+<#
+.Synopsis
+   Возвращает путь к файлу nethasp.ini
+.DESCRIPTION
+   
+.EXAMPLE
+   Get-NetHaspIniFilePath
+.OUTPUTS
+   Путь к к файлу nethasp.ini
+#>
+{  
+    $pathToStarter = Find-1CEstart
+    $pathToStarter.Replace("common\1cestart.exe", "conf\nethasp.ini")
+}

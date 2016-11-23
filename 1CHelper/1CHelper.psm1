@@ -1,4 +1,4 @@
-﻿function Delete-NotUsedObjects
+function Remove-NotUsedObjects
 <#
 .Synopsis
    Удаление неиспользуемых объектов конфигурации
@@ -495,6 +495,78 @@ function Find-1CEstart
     $pathToStarter
 }
 
+function Find-1C8conn
+<#
+.Synopsis
+   Поиск строк подключения 1С
+.DESCRIPTION
+   Поиск строк подключения
+.EXAMPLE
+   Find-1C8conn
+.OUTPUTS
+   массив найденных строк поключения 1С
+#>
+{
+    [OutputType([Object[]])]
+    Param(
+        # Использовать общие файлы
+        [switch]$UseCommonFiles = $true,
+        [string[]]$UseFilesFromDirectories
+    )
+
+    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
+    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
+
+    $list = @()
+
+    # TODO 
+
+    $list
+    
+}
+
+function Get-LicensesStatistic
+<#
+.Synopsis
+   Собирает статистику использования лицензий по серверам (не ниже 8.3)
+.DESCRIPTION
+   
+.EXAMPLE
+   Get-LicensesStatistic
+.EXAMPLE
+   Get-LicensesStatistic 'srv-01','srv-02'
+.OUTPUTS
+   Таблицу статискики
+#>
+{
+    [OutputType([Object])]
+    Param(
+        # Использовать список компьютеров из файла nethasp.ini
+        [switch]$UseNetHasp=$false,
+        # Адреса компьютеров для проверки лицензий
+        [string[]]$Hosts
+    )
+
+    $hostsToQuery = @()
+
+    if ( $UseNetHasp ) {
+        $netHaspParams = Get-NetHaspIniStrings
+        $hostsToQuery += $netHaspParams.NH_SERVER_ADDR
+        $hostsToQuery += $netHaspParams.NH_SERVER_NAME
+    }
+
+    if ( $Hosts ) {
+        $hostsToQuery += $Hosts
+    }
+
+    $connector = New-Object -ComObject "v83.COMConnector"
+    
+    if ( $connector ) {
+        
+    }
+
+}
+
 function Get-NetHaspIniStrings
 <#
 .Synopsis
@@ -539,8 +611,9 @@ function Find-1CApplicationForExportImport
 {
     Param(
         # Имя компьютера для поиска версии
-        [string]$computerName=''
+        [string]$ComputerName=''
     )
+
     $installationPath = $null
 
     $pvs = 0
@@ -597,8 +670,11 @@ function Find-1CApplicationForExportImport
              }
  
          }
+
          $reg.Close() 
+
      }
+
      $installationPath
 }
 
@@ -614,7 +690,7 @@ function Get-NetHaspDirectoryPath
    Путь к каталогу с библиотекой hsmon.dll
 #>
 {  
-    (Get-Module 1CHelper).Path.Replace("1CHelper.psm1", "nethasp")
+    (Get-Module 1CHelper).Path.Replace("\1CHelper.psm1", "")
 }
 
 function Get-NetHaspIniFilePath
@@ -631,4 +707,104 @@ function Get-NetHaspIniFilePath
 {  
     $pathToStarter = Find-1CEstart
     $pathToStarter.Replace("common\1cestart.exe", "conf\nethasp.ini")
+}
+
+function Invoke-NetHasp
+<#
+.Synopsis
+   Вызывает на выполнение сценарий nethasp.ps1 в текущем окне
+
+.DESCRIPTION
+   
+.EXAMPLE
+   # Вывод информации о версии библиотеки
+   Invoke-NetHasp -Verbose
+   
+.EXAMPLE
+   # Поиск серверов
+   Invoke-NetHasp -Discovery -Verbose
+
+#>
+{
+    [CmdletBinding()]
+    Param (
+       [Parameter(Mandatory = $False)] 
+       [ValidateSet('DoCommand', 'Discovery', 'Get', 'Count')]
+       [String]$Action = 'DoCommand',
+       [Parameter(Mandatory = $False)]
+       [ValidateSet('Server', 'Module', 'Slot', 'Login')]
+       [Alias('Object')]
+       [String]$ObjectType = 'Server',
+       [Parameter(Mandatory = $False)]
+       [String]$Key = 'VERSION',
+       [Parameter(Mandatory = $False)]
+       [String]$ServerId,
+       [Parameter(Mandatory = $False)]
+       [String]$ModuleId,
+       [Parameter(Mandatory = $False)]
+       [String]$SlotId,
+       [Parameter(Mandatory = $False)]
+       [String]$LoginId,
+       [Parameter(Mandatory = $False)]
+       [String]$ErrorCode='-127',
+       [Parameter(Mandatory = $False)]
+       [String]$ConsoleCP,
+       [Parameter(Mandatory = $False)]
+       [Switch]$DefaultConsoleWidth,
+       [Parameter(Mandatory = $False)]
+       [Int]$HSMON_SCAN_TIMEOUT = 30
+    )
+
+    $HSMON_LIB_PATH = (Get-NetHaspDirectoryPath).Replace('\','\\')
+    $HSMON_INI_FILE = (Get-NetHaspIniFilePath).Replace('\','\\')
+    
+    . "$(Get-NetHaspDirectoryPath)\nethasp.ps1" -Action:$Action -ObjectType:$ObjectType -Key:$Key  `
+                                                -ServerId:$ServerId -ModuleId:$ModuleId -SlotId:$SlotId `
+                                                -LoginId:$LoginId -ErrorCode:$ErrorCode -ConsoleCP:$ConloleCP `
+                                                -HSMON_LIB_PATH:$HSMON_LIB_PATH -HSMON_INI_FILE:$HSMON_INI_FILE `
+                                                -DefaultConsoleWidth:$DefaultConsoleWidth -HSMON_SCAN_TIMEOUT:$HSMON_SCAN_TIMEOUT
+}
+
+function Invoke-UsbHasp
+<#
+.Synopsis
+   Вызывает на выполнение сценарий usbhasp.ps1 в текущем окне
+
+.DESCRIPTION
+   
+.EXAMPLE
+   Invoke-UsbHasp -Verbose
+   
+.EXAMPLE
+   Invoke-UsbHasp -Discovery -Verbose
+
+#>
+{
+    [CmdletBinding()]
+    Param (
+       [Parameter(Mandatory = $False)] 
+       [ValidateSet('Discovery','Get','Count')]
+       [String]$Action = 'Discovery',
+       [Parameter(Mandatory = $False)]
+       [ValidateSet('LogicalDevice','USBController')]
+       [Alias('Object')]
+       [String]$ObjectType = 'USBController',
+       [Parameter(Mandatory = $False)]
+       [String]$Key,
+       [Parameter(Mandatory = $False)]
+       [String]$PnPDeviceID,
+       [Parameter(Mandatory = $False)]
+       [String]$ErrorCode = '-127',
+       [Parameter(Mandatory = $False)]
+       [String]$ConsoleCP,
+       [Parameter(Mandatory = $False)]
+       [Switch]$DefaultConsoleWidth
+    )
+
+    $HSMON_LIB_PATH = (Get-NetHaspDirectoryPath).Replace('\','\\')
+    $HSMON_INI_FILE = (Get-NetHaspIniFilePath).Replace('\','\\')
+    
+    . "$(Get-NetHaspDirectoryPath)\usbhasp.ps1" -Action:$Action -ObjectType:$ObjectType -Key:$Key  `
+                                                -ErrorCode:$ErrorCode -ConsoleCP:$ConloleCP `
+                                                -DefaultConsoleWidth:$DefaultConsoleWidth
 }

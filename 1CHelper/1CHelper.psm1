@@ -495,6 +495,35 @@ function Find-1CEstart
     $pathToStarter
 }
 
+function Get-NetHaspIniStrings
+<#
+.Synopsis
+   Находит значения параметров в файле nethasp.ini
+.DESCRIPTION
+   
+.EXAMPLE
+   Get-NetHaspIniStrings
+.OUTPUTS
+   Структура параметров
+#>
+{
+    
+    $struct = @{}
+    
+    $pathToStarter = Find-1CEstart
+
+    if ( $pathToStarter ) {
+        
+        $content = Get-Content -Encoding UTF8 -LiteralPath $pathToFile
+        $strings = $content | ? { $_ -match "^\w" }
+        $strings | % { $keyValue = $_.Split('='); $key = $keyValue[0].Replace(" ",""); $value = $keyValue[1].Replace(" ",""); $struct[$key] = $value.Split(',') }
+
+    }
+
+    $struct
+
+}
+
 function Find-1CApplicationForExportImport
 <#
 .Synopsis

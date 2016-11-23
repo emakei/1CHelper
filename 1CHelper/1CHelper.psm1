@@ -406,6 +406,124 @@
     }
 }
 
+function Find-1CEstart
+<#
+.Synopsis
+   Поиск стартера 1С
+.DESCRIPTION
+   Поиск исполняемого файла 1cestart.exe
+.EXAMPLE
+   Find-1CEstart
+.OUTPUTS
+   NULL или строку с полным путём к исполняемому файлу
+#>
+{
+    Param(
+        # Имя компьютера для поиска версии
+        [string]$ComputerName = $env:COMPUTERNAME
+    )
+    
+    $pathToStarter = $null
+
+    $keys = @( @{ leaf='ClassesRoot'; path='Applications\\1cestart.exe\\shell\\open\\command' } )
+    $keys += @{ leaf='ClassesRoot'; path='V83.InfoBaseList\\shell\\open\\command' }
+    $keys += @{ leaf='ClassesRoot'; path='V83.InfoBaseListLink\\shell\\open\\command' }
+    $keys += @{ leaf='ClassesRoot'; path='V82.InfoBaseList\\shell\\open\\command' }
+    $keys += @{ leaf='LocalMachine'; path='SOFTWARE\\Classes\\Applications\\1cestart.exe\\shell\\open\\command' }
+    $keys += @{ leaf='LocalMachine'; path='SOFTWARE\\Classes\\V83.InfoBaseList\\shell\\open\\command' }
+    $keys += @{ leaf='LocalMachine'; path='SOFTWARE\\Classes\\V83.InfoBaseListLink\\shell\\open\\command' }
+    $keys += @{ leaf='LocalMachine'; path='SOFTWARE\\Classes\\V82.InfoBaseList\\shell\\open\\command' }
+
+    foreach( $key in $keys ) {
+                
+         Try {
+             $reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey( $key.leaf, $computerName )
+         } Catch {
+             Write-Error $_
+             Continue
+         }
+ 
+         $regkey = $reg.OpenSubKey( $key.path )
+
+         If( -not $regkey ) {
+             Write-Error "Не найдены ключи в: $($string.leaf)\\$($string.path)"
+         }
+
+         $defaultValue = $regkey.GetValue("").ToString()
+
+         $index = $defaultValue.IndexOf("1cestart.exe")
+
+         if ( $index -gt 0 ) {
+
+            if ( $defaultValue[0] -eq '"' ) {
+                $pathToStarter = $defaultValue.Substring( 1, $index + 11 )
+            } else {
+                $pathToStarter = $defaultValue.Substring( 0, $index + 11 )
+            }
+
+            $reg.Close()
+            Break
+
+         }
+
+         $reg.Close()
+
+    }
+
+    # если не удалось найти, то пробуем через WinRM
+
+    if ( -not $pathToStarter -and $ComputerName -ne $env:COMPUTERNAME ) {
+
+        $pathToStarter = Invoke-Command -ComputerName $ComputerName -ScriptBlock { 
+                            if ( Test-Path "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" ) {
+                                "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" 
+                            } elseif ( Test-Path "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe" ) {
+                                "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe"
+                            } else { $null } 
+                         } -ErrorAction Continue
+
+    } elseif ( -not $pathToStarter ) {
+
+        $pathToStarter = if ( Test-Path "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" ) {
+                                "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" 
+                            } elseif ( Test-Path "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe" ) {
+                                "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe"
+                            } else { $null }
+                              
+    }
+
+    $pathToStarter
+}
+
+function Find-1C8conn
+<#
+.Synopsis
+   Поиск строк подключения 1С
+.DESCRIPTION
+   Поиск строк подключения
+.EXAMPLE
+   Find-1C8conn
+.OUTPUTS
+   массив найденных строк поключения 1С
+#>
+{
+    [OutputType([Object[]])]
+    Param(
+        # Файлы для разбора
+        [Object[]]$Files
+    )
+
+    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
+    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
+
+    $list = @()
+
+    # TODO 
+
+    $list
+    
+}
+
 function Find-1CApplicationForExportImport
 <#
 .Synopsis

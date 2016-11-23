@@ -495,35 +495,6 @@ function Find-1CEstart
     $pathToStarter
 }
 
-function Find-1C8conn
-<#
-.Synopsis
-   Поиск строк подключения 1С
-.DESCRIPTION
-   Поиск строк подключения
-.EXAMPLE
-   Find-1C8conn
-.OUTPUTS
-   массив найденных строк поключения 1С
-#>
-{
-    [OutputType([Object[]])]
-    Param(
-        # Файлы для разбора
-        [Object[]]$Files
-    )
-
-    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
-    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
-
-    $list = @()
-
-    # TODO 
-
-    $list
-    
-}
-
 function Find-1CApplicationForExportImport
 <#
 .Synopsis

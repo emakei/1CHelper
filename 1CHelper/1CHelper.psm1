@@ -2,8 +2,10 @@ function Remove-NotUsedObjects
 <#
 .Synopsis
    Удаление неиспользуемых объектов конфигурации
+
 .DESCRIPTION
    Удаление элементов конфигурации с синонимом "(не используется)"
+
 .EXAMPLE
    PS C:\> $modules = Delete-NoUsedTypes E:\TEMP\ExportingConfiguration
    PS C:\> $gr = $modules | group File, Object | select -First 1
@@ -13,10 +15,20 @@ function Remove-NotUsedObjects
    PS C:\>  $modules = $modules | ? File -NE ($gr.Group.File | select -First 1) # удаление обработанного файла из списка объектов
    # альтернатива '$modules = $modules | ? File -NE $psise.CurrentFile.FullPath'
    # и все сначала с команды '$gr = $modules | group File, Object | select -First 1'
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .INPUTS
    Пусть к файлам выгрузки конфигурации
+
 .OUTPUTS
    Массив объектов с описанием файлов модулей и позиций, содержащих упоминания удаляемых объектов
+
 #>
 {
     [CmdletBinding(DefaultParameterSetName='pathToConfigurationFiles', 
@@ -410,10 +422,20 @@ function Find-1CEstart
 <#
 .Synopsis
    Поиск стартера 1С
+
 .DESCRIPTION
    Поиск исполняемого файла 1cestart.exe
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .EXAMPLE
    Find-1CEstart
+
 .OUTPUTS
    NULL или строку с полным путём к исполняемому файлу
 #>
@@ -499,10 +521,20 @@ function Find-1C8conn
 <#
 .Synopsis
    Поиск строк подключения 1С
+
 .DESCRIPTION
    Поиск строк подключения
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .EXAMPLE
    Find-1C8conn
+
 .OUTPUTS
    массив найденных строк поключения 1С
 #>
@@ -530,11 +562,20 @@ function Get-LicensesStatistic
 .Synopsis
    Собирает статистику использования лицензий по серверам (не ниже 8.3)
 .DESCRIPTION
-   
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .EXAMPLE
    Get-LicensesStatistic
+
 .EXAMPLE
    Get-LicensesStatistic 'srv-01','srv-02'
+
 .OUTPUTS
    Таблицу статискики
 #>
@@ -572,9 +613,17 @@ function Get-NetHaspIniStrings
 .Synopsis
    Находит значения параметров в файле nethasp.ini
 .DESCRIPTION
-   
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .EXAMPLE
    Get-NetHaspIniStrings
+
 .OUTPUTS
    Структура параметров
 #>
@@ -601,10 +650,20 @@ function Find-1CApplicationForExportImport
 <#
 .Synopsis
    Поиск максимальной версии приложения
+
 .DESCRIPTION
    Поиск максимальной версии приложения (не ниже 8.3)
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .EXAMPLE
    Find-1CApplicationForExportImport
+
 .OUTPUTS
    NULL или строку с путем установки приложения
 #>
@@ -682,10 +741,19 @@ function Get-NetHaspDirectoryPath
 <#
 .Synopsis
    Возвращает путь к каталогу с библиотекой hsmon.dll
+
 .DESCRIPTION
-   
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .EXAMPLE
    Get-NetHaspDirectoryPath
+
 .OUTPUTS
    Путь к каталогу с библиотекой hsmon.dll
 #>
@@ -697,60 +765,25 @@ function Get-NetHaspIniFilePath
 <#
 .Synopsis
    Возвращает путь к файлу nethasp.ini
+
 .DESCRIPTION
-   
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
 .EXAMPLE
    Get-NetHaspIniFilePath
+
 .OUTPUTS
    Путь к к файлу nethasp.ini
 #>
 {  
     $pathToStarter = Find-1CEstart
     $pathToStarter.Replace("common\1cestart.exe", "conf\nethasp.ini")
-}
-
-function Invoke-UsbHasp
-<#
-.Synopsis
-   Вызывает на выполнение сценарий usbhasp.ps1 в текущем окне
-
-.DESCRIPTION
-   
-.EXAMPLE
-   Invoke-UsbHasp -Verbose
-   
-.EXAMPLE
-   Invoke-UsbHasp -Discovery -Verbose
-
-#>
-{
-    [CmdletBinding()]
-    Param (
-       [Parameter(Mandatory = $False)] 
-       [ValidateSet('Discovery','Get','Count')]
-       [String]$Action = 'Discovery',
-       [Parameter(Mandatory = $False)]
-       [ValidateSet('LogicalDevice','USBController')]
-       [Alias('Object')]
-       [String]$ObjectType = 'USBController',
-       [Parameter(Mandatory = $False)]
-       [String]$Key,
-       [Parameter(Mandatory = $False)]
-       [String]$PnPDeviceID,
-       [Parameter(Mandatory = $False)]
-       [String]$ErrorCode = '-127',
-       [Parameter(Mandatory = $False)]
-       [String]$ConsoleCP,
-       [Parameter(Mandatory = $False)]
-       [Switch]$DefaultConsoleWidth
-    )
-
-    $HSMON_LIB_PATH = (Get-NetHaspDirectoryPath).Replace('\','\\')
-    $HSMON_INI_FILE = (Get-NetHaspIniFilePath).Replace('\','\\')
-    
-    . "$(Get-NetHaspDirectoryPath)\usbhasp.ps1" -Action:$Action -ObjectType:$ObjectType -Key:$Key  `
-                                                -ErrorCode:$ErrorCode -ConsoleCP:$ConloleCP `
-                                                -DefaultConsoleWidth:$DefaultConsoleWidth
 }
 
 <# BEGIN
@@ -1334,6 +1367,151 @@ function Invoke-NetHasp
        Write-Verbose "$(Get-Date) Changing console width to $CONSOLE_WIDTH";
        mode con cols=$CONSOLE_WIDTH; 
     }#>
+
+    Write-Verbose "$(Get-Date) Finishing";
+    $Result;
+}
+
+function Invoke-UsbHasp
+<#
+.SYNOPSIS  
+    Return USB (HASP) Device metrics value, count selected objects, make LLD-JSON for Zabbix
+
+.DESCRIPTION
+    Return USB (HASP) Device metrics value, count selected objects, make LLD-JSON for Zabbix
+
+.NOTES  
+    Version: 1.2.1
+    Name: USB HASP Keys Miner
+    Author: zbx.sadman@gmail.com
+    DateCreated: 18MAR2016
+    Testing environment: Windows Server 2008R2 SP1, USB/IP service, Powershell 2.0
+
+.LINK  
+    https://github.com/zbx-sadman
+
+.PARAMETER Action
+    What need to do with collection or its item:
+        Discovery - Make Zabbix's LLD JSON;
+        Get       - Get metric from collection item;
+        Count     - Count collection items.
+
+.PARAMETER ObjectType
+    Define rule to make collection:
+        USBController - "Physical" devices (USB Key)
+        LogicalDevice - "Logical" devices (HASP Key)
+
+.PARAMETER Key
+    Define "path" to collection item's metric 
+
+.PARAMETER PnPDeviceID
+    Used to select only one item from collection
+
+.PARAMETER ErrorCode
+    What must be returned if any process error will be reached
+
+.PARAMETER Verbose
+    Enable verbose messages
+
+.EXAMPLE 
+    Invoke-UsbHasp -Action "Discovery" -ObjectType "USBController"
+
+    Description
+    -----------  
+    Make Zabbix's LLD JSON for USB keys
+
+.EXAMPLE 
+    ... -Action "Count" -ObjectType "LogicalDevice"
+
+    Description
+    -----------  
+    Return number of HASP keys
+
+.EXAMPLE 
+    ... -Action "Get" -ObjectType "USBController" -PnPDeviceID "USB\VID_0529&PID_0001\1&79F5D87&0&01" -ErrorCode "-127" -DefaultConsoleWidth -Verbose
+
+    Description
+    -----------  
+    Show formatted list of 'USBController' object metrics selected by PnPId "USB\VID_0529&PID_0001\1&79F5D87&0&01". 
+    Return "-127" when processing error caused. Verbose messages is enabled. 
+
+    Note that PNPDeviceID is unique for USB Key, ID - is not.
+#>
+{
+    Param (
+       [Parameter(Mandatory = $False)] 
+       [ValidateSet('Discovery','Get','Count')]
+       [String]$Action,
+       [Parameter(Mandatory = $False)]
+       [ValidateSet('LogicalDevice','USBController')]
+       [Alias('Object')]
+       [String]$ObjectType,
+       [Parameter(Mandatory = $False)]
+       [String]$Key,
+       [Parameter(Mandatory = $False)]
+       [String]$PnPDeviceID,
+       [Parameter(Mandatory = $False)]
+       [String]$ErrorCode = '-127',
+       [Parameter(Mandatory = $False)]
+       [Switch]$NoJSON = $true
+    );
+
+    # split key
+    $Keys = $Key.Split(".");
+
+    Write-Verbose "$(Get-Date) Taking Win32_USBControllerDevice collection with WMI"
+    $Objects = Get-WmiObject -Class "Win32_USBControllerDevice";
+
+    Write-Verbose "$(Get-Date) Creating collection of specified object: '$ObjectType'";
+    Switch ($ObjectType) {
+       'LogicalDevice' { 
+          $PropertyToSelect = 'Dependent';    
+       }
+       'USBController' { 
+          $PropertyToSelect = 'Antecedent';    
+       }
+    }
+
+    # Need to take Unique items due Senintel used multiply logical devices linked to physical keys. 
+    # As a result - double "physical" device items into 'Antecedent' branch
+    #
+    # When the -InputObject parameter is used to submit a collection of items, Sort-Object receives one object that represents the collection.
+    # Because one object cannot be sorted, Sort-Object returns the entire collection unchanged.
+    # To sort objects, pipe them to Sort-Object.
+    # (C) PoSh manual
+    $Objects = $( ForEach ($Object In $Objects) { 
+                     PropertyEqualOrAny -InputObject ([Wmi]$Object.$PropertyToSelect) -Property PnPDeviceID -Value $PnPDeviceID
+               }) | Sort-Object -Property PnPDeviceID -Unique;
+
+    Write-Verbose "$(Get-Date) Processing collection with action: '$Action' ";
+    Switch ($Action) {
+       # Discovery given object, make json for zabbix
+       'Discovery' {
+          Write-Verbose "$(Get-Date) Generating LLD JSON";
+          $ObjectProperties = @("NAME", "PNPDEVICEID");
+          if ( -not $NoJSON ) {
+            $Result = Make-JSON -InputObject $Objects -ObjectProperties $ObjectProperties -Pretty;
+          } else {
+            $Result = $Objects
+          }
+       }
+       # Get metrics or metric list
+       'Get' {
+          If ($Keys) { 
+             Write-Verbose "$(Get-Date) Getting metric related to key: '$Key'";
+             $Result = PrepareTo-Zabbix -InputObject (Get-Metric -InputObject $Objects -Keys $Keys) -ErrorCode $ErrorCode;
+          } Else { 
+             Write-Verbose "$(Get-Date) Getting metric list due metric's Key not specified";
+             $Result = $Objects;
+          };
+       }
+       # Count selected objects
+       'Count' { 
+          Write-Verbose "$(Get-Date) Counting objects";  
+          # if result not null, False or 0 - return .Count
+          $Result = $( If ($Objects) { @($Objects).Count } Else { 0 } ); 
+       }
+    }
 
     Write-Verbose "$(Get-Date) Finishing";
     $Result;

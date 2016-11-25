@@ -557,10 +557,11 @@ function Find-1C8conn
     
 }
 
-function Get-LicensesStatistic
+function Get-1CServersStatistics
 <#
 .Synopsis
-   Собирает статистику использования лицензий по серверам (не ниже 8.3)
+    Собирает статистику использования лицензий по серверам (не ниже 8.3)
+
 .DESCRIPTION
 
 .NOTES  
@@ -571,39 +572,461 @@ function Get-LicensesStatistic
     https://github.com/mrDSide/1CHelper.psm1
 
 .EXAMPLE
-   Get-LicensesStatistic
+    Get-LicensesStatistic
 
 .EXAMPLE
-   Get-LicensesStatistic 'srv-01','srv-02'
+    Get-LicensesStatistic 'srv-01','srv-02'
+
+.EXAMPLE
+    $netHaspParams = Get-NetHaspIniStrings
+    $hostsToQuery += $netHaspParams.NH_SERVER_ADDR
+    $hostsToQuery += $netHaspParams.NH_SERVER_NAME
+    
+    $stat = $hostsToQuery | % { Get-1CServersStatistics $_ -Verbose }
 
 .OUTPUTS
-   Таблицу статискики
+    Статистика
 #>
 {
-    [OutputType([Object])]
+    [OutputType([Object[]])]
+    [CmdletBinding()]
     Param(
         # Использовать список компьютеров из файла nethasp.ini
-        [switch]$UseNetHasp=$false,
-        # Адреса компьютеров для проверки лицензий
-        [string[]]$Hosts
+        # Адрес хоста для сбора статистики
+        [string]$hostToConnect,
+        # верия компоненты
+        [ValidateSet(2, 3, 4)]
+        [int]$Version=3,
+        [string]$User="",
+        [string]$Password=""
     )
 
-    $hostsToQuery = @()
-
-    if ( $UseNetHasp ) {
-        $netHaspParams = Get-NetHaspIniStrings
-        $hostsToQuery += $netHaspParams.NH_SERVER_ADDR
-        $hostsToQuery += $netHaspParams.NH_SERVER_NAME
-    }
-
-    if ( $Hosts ) {
-        $hostsToQuery += $Hosts
-    }
-
-    $connector = New-Object -ComObject "v83.COMConnector"
+    Begin {
     
-    if ( $connector ) {
-        # TODO
+        $connector = New-Object -ComObject "v8$version.COMConnector"
+
+    }
+
+    Process {
+              
+        $obj = 1 | Select-Object  @{ name = 'Host';     Expression = { $hostToConnect } }`
+                                , @{ name = 'Error';    Expression = { '' } }`
+                                , @{ name = 'Clusters'; Expression = {  @() } }
+
+        try {
+            $connection = $connector.ConnectAgent( $hostToConnect )
+        } catch {
+            Write-Warning $_
+            $obj.Error = $_.Exception.Message
+            $result = $obj
+            $abort = $true
+        }
+        
+        if ( -not $abort ) {
+            
+            Write-Verbose "Подключен к `"$($connection.ConnectionString)`""
+
+            $clusters = $connection.GetClusters()
+
+            foreach( $cluster in $clusters ) {
+                
+                $cls = 1 | Select-Object  @{ name = 'ClusterName';                Expression = { $cluster.ClusterName } }`
+                                        , @{ name = 'ExpirationTimeout';          Expression = { $cluster.ExpirationTimeout } }`
+                                        , @{ name = 'HostName';                   Expression = { $cluster.HostName } }`
+                                        , @{ name = 'LoadBalancingMode';          Expression = { $cluster.LoadBalancingMode } }`
+                                        , @{ name = 'MainPort';                   Expression = { $cluster.MainPort } }`
+                                        , @{ name = 'MaxMemorySize';              Expression = { $cluster.MaxMemorySize } }`
+                                        , @{ name = 'MaxMemoryTimeLimit';         Expression = { $cluster.MaxMemoryTimeLimit } }`
+                                        , @{ name = 'SecurityLevel';              Expression = { $cluster.SecurityLevel } }`
+                                        , @{ name = 'SessionFaultToleranceLevel'; Expression = { $cluster.SessionFaultToleranceLevel } }`
+                                        , @{ name = 'Error'; Expression = {} }
+
+                Write-Verbose "Получение информации кластера `"$($cluster.ClusterName)`" на `"$($cluster.HostName)`""
+                
+                try {
+                    $connection.Authenticate( $cluster, $User, $Password )
+                } catch {
+                    Write-Warning $_
+                    $cls.Error = $_.Exception.Message
+                    $obj.Clusters += $cls
+                    $result = $obj
+                    $abort = $true
+                }
+
+                if ( -not $abort ) {
+                    
+                    # TODO возможно нужно получить информацию из 'GetAgentAdmins'
+
+                    $admins = $connection.GetClusterAdmins( $cluster )
+                    $objAdmin = @()
+
+                    foreach ( $admin in $admins ) {
+                        $objAdmin += 1 | Select-Object  @{ Name = 'Name';                Expression = { $admin.Name } },
+                                                        @{ Name = 'Descr';               Expression = { $admin.Descr } },
+                                                        @{ Name = 'PasswordAuthAllowed'; Expression = { $admin.PasswordAuthAllowed } },
+                                                        @{ Name = 'SysAuthAllowed';      Expression = { $admin.SysAuthAllowed } },
+                                                        @{ Name = 'SysUserName';         Expression = { $admin.SysUserName } }
+                    }
+
+                    Add-Member -InputObject $cls -Name ClusterAdmins -Value $objAdmin -MemberType NoteProperty
+
+                    $mngrs = $connection.GetClusterManagers( $cluster )
+                    $objMngr = @()
+
+                    foreach ( $mngr in $mngrs ) {
+                        $objMngr += 1 | Select-Object  @{ Name = 'HostName';    Expression = { $mngr.HostName } },
+                                                       @{ Name = 'Descr';       Expression = { $mngr.Descr } },
+                                                       @{ Name = 'MainManager'; Expression = { $mngr.MainManager } },
+                                                       @{ Name = 'MainPort';    Expression = { $mngr.MainPort } },
+                                                       @{ Name = 'PID';         Expression = { $mngr.PID } }
+                    }
+
+                    Add-Member -InputObject $cls -Name ClusterManagers -Value $objMngr -MemberType NoteProperty
+
+                    $ws = $connection.GetWorkingServers( $cluster )
+                    $objWS = @()
+                    foreach( $workingServer in $ws ) {
+                        $objWS += 1 | Select-Object @{ Name = 'ClusterMainPort';                   Expression = { $workingServer.ClusterMainPort } },
+                                                    @{ Name = 'ConnectionsPerWorkingProcessLimit'; Expression = { $workingServer.ConnectionsPerWorkingProcessLimit } },
+                                                    @{ Name = 'DedicatedManagers';                 Expression = { $workingServer.DedicatedManagers } },
+                                                    @{ Name = 'HostName';                          Expression = { $workingServer.HostName } },
+                                                    @{ Name = 'InfoBasesPerWorkingProcessLimit';   Expression = { $workingServer.InfoBasesPerWorkingProcessLimit } },
+                                                    @{ Name = 'MainPort';                          Expression = { $workingServer.MainPort } },
+                                                    @{ Name = 'MainServer';                        Expression = { $workingServer.MainServer } },
+                                                    @{ Name = 'Name';                              Expression = { $workingServer.Name } },
+                                                    @{ Name = 'SafeCallMemoryLimit';               Expression = { $workingServer.SafeCallMemoryLimit } },
+                                                    @{ Name = 'SafeWorkingProcessesMemoryLimit';   Expression = { $workingServer.SafeWorkingProcessesMemoryLimit } },
+                                                    @{ Name = 'WorkingProcessMemoryLimit';         Expression = { $workingServer.WorkingProcessMemoryLimit } }
+                    }
+                
+                    Add-Member -InputObject $cls -Name WorkingServers -Value $objWS -MemberType NoteProperty
+                
+                    $wp = $connection.GetWorkingProcesses( $cluster )
+                    $objWP = @()
+
+                    foreach( $workingProcess in $wp ) {
+                    
+                        $objWP += 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $workingProcess.AvailablePerfomance } },
+                                                    @{ Name = 'AvgBackCallTime';     Expression = { $workingProcess.AvgBackCallTime } },
+                                                    @{ Name = 'AvgCallTime';         Expression = { $workingProcess.AvgCallTime } },
+                                                    @{ Name = 'AvgDBCallTime';       Expression = { $workingProcess.AvgDBCallTime } },
+                                                    @{ Name = 'AvgLockCallTime';     Expression = { $workingProcess.AvgLockCallTime } },
+                                                    @{ Name = 'AvgServerCallTime';   Expression = { $workingProcess.AvgServerCallTime } },
+                                                    @{ Name = 'AvgThreads';          Expression = { $workingProcess.AvgThreads } },
+                                                    @{ Name = 'Capacity';            Expression = { $workingProcess.Capacity } },
+                                                    @{ Name = 'Connections';         Expression = { $workingProcess.Connections } },
+                                                    @{ Name = 'HostName';            Expression = { $workingProcess.HostName } },
+                                                    @{ Name = 'IsEnable';            Expression = { $workingProcess.IsEnable } },
+                                                    @{ Name = 'License';             Expression = { try { $workingProcess.License.FullPresentation } catch { $null } } },
+                                                    @{ Name = 'MainPort';            Expression = { $workingProcess.MainPort   } },
+                                                    @{ Name = 'MemoryExcessTime';    Expression = { $workingProcess.MemoryExcessTime } },
+                                                    @{ Name = 'MemorySize';          Expression = { $workingProcess.MemorySize } },
+                                                    @{ Name = 'PID';                 Expression = { $workingProcess.PID } },
+                                                    @{ Name = 'Running';             Expression = { $workingProcess.Running } },
+                                                    @{ Name = 'SelectionSize';       Expression = { $workingProcess.SelectionSize } },
+                                                    @{ Name = 'StartedAt';           Expression = { $workingProcess.StartedAt } },
+                                                    @{ Name = 'Use';                 Expression = { $workingProcess.Use } }
+
+                    }
+
+                    Add-Member -InputObject $cls -Name WorkingProcesses -Value $objWP -MemberType NoteProperty
+
+                    $сs = $connection.GetClusterServices( $cluster )
+                    $objCS = @()
+                    foreach( $service in $сs ) {
+                        $objCS += 1 | Select-Object @{ Name = 'Descr';    Expression = { $service.Descr } },
+                                                    @{ Name = 'MainOnly'; Expression = { $service.MainOnly } },
+                                                    @{ Name = 'Name';     Expression = { $service.Name } }
+                        $objCM = @()
+                        foreach( $cmngr in $service.ClusterManagers ) {
+                            $objCM += 1 | Select-Object @{ Name = 'HostName';    Expression = { $cmngr.HostName } },
+                                                        @{ Name = 'Descr';       Expression = { $cmngr.Descr } },
+                                                        @{ Name = 'MainManager'; Expression = { $cmngr.MainManager } },
+                                                        @{ Name = 'MainPort';    Expression = { $cmngr.MainPort } },
+                                                        @{ Name = 'PID';         Expression = { $cmngr.PID } }
+                        }
+                        Add-Member -InputObject $objCS -Name ClusterManagers -Value $objCM -MemberType NoteProperty
+                    }             
+
+                    $cConnections = $connection.GetConnections( $cluster )
+                    $objCC = @()
+                    foreach( $conn in $cConnections ) {
+                        
+                        $objCC += 1 | Select-Object @{ Name = 'Application'; Expression = { $conn.Application } },
+                                                    @{ Name = 'blockedByLS'; Expression = { $conn.blockedByLS } },
+                                                    @{ Name = 'ConnectedAt'; Expression = { $conn.ConnectedAt } },
+                                                    @{ Name = 'ConnID';      Expression = { $conn.ConnID } },
+                                                    @{ Name = 'Host';        Expression = { $conn.Host } },
+                                                    @{ Name = 'InfoBase';    Expression = { @{ Descr = $conn.InfoBase.Descr; Name = $conn.InfoBase.Name } } },
+                                                    @{ Name = 'SessionID';   Expression = { $conn.SessionID } },
+                                                    @{ Name = 'Process';     Expression = { 1 | Select-Object   @{ Name = 'AvailablePerfomance'; Expression = { $conn.Process.AvailablePerfomance } },
+                                                                                                                @{ Name = 'AvgBackCallTime';     Expression = { $conn.Process.AvgBackCallTime } },
+                                                                                                                @{ Name = 'AvgCallTime';         Expression = { $conn.Process.AvgCallTime } },
+                                                                                                                @{ Name = 'AvgDBCallTime';       Expression = { $conn.Process.AvgDBCallTime } },
+                                                                                                                @{ Name = 'AvgLockCallTime';     Expression = { $conn.Process.AvgLockCallTime } },
+                                                                                                                @{ Name = 'AvgServerCallTime';   Expression = { $conn.Process.AvgServerCallTime } },
+                                                                                                                @{ Name = 'AvgThreads';          Expression = { $conn.Process.AvgThreads } },
+                                                                                                                @{ Name = 'Capacity';            Expression = { $conn.Process.Capacity } },
+                                                                                                                @{ Name = 'Connections';         Expression = { $conn.Process.Connections } },
+                                                                                                                @{ Name = 'HostName';            Expression = { $conn.Process.HostName } },
+                                                                                                                @{ Name = 'IsEnable';            Expression = { $conn.Process.IsEnable } },
+                                                                                                                @{ Name = 'License';             Expression = { try { $conn.Process.License.FullPresentation } catch { $null } } },
+                                                                                                                @{ Name = 'MainPort';            Expression = { $conn.Process.MainPort   } },
+                                                                                                                @{ Name = 'MemoryExcessTime';    Expression = { $conn.Process.MemoryExcessTime } },
+                                                                                                                @{ Name = 'MemorySize';          Expression = { $conn.Process.MemorySize } },
+                                                                                                                @{ Name = 'PID';                 Expression = { $conn.Process.PID } },
+                                                                                                                @{ Name = 'Running';             Expression = { $conn.Process.Running } },
+                                                                                                                @{ Name = 'SelectionSize';       Expression = { $conn.Process.SelectionSize } },
+                                                                                                                @{ Name = 'StartedAt';           Expression = { $conn.Process.Process.StartedAt } },
+                                                                                                                @{ Name = 'Use';                 Expression = { $conn.Process.Use } }} }
+
+                        $locks = $connection.GetConnectionLocks( $cluster, $conn )
+                        $objLock = @()
+                        foreach( $lock in $locks ) {
+                            $objLock += 1 | Select-Object @{ Name = 'Connection';  Expression = { if ( $lock.Connection ) { 1 | Select-Object @{ Name = 'Application'; Expression = { $lock.Connection.Application } },
+                                                                                                                @{ Name = 'blockedByLS'; Expression = { $lock.Connection.blockedByLS } },
+                                                                                                                @{ Name = 'ConnectedAt'; Expression = { $lock.Connection.ConnectedAt } },
+                                                                                                                @{ Name = 'ConnID';      Expression = { $lock.Connection.ConnID } },
+                                                                                                                @{ Name = 'Host';        Expression = { $lock.Connection.Host } },
+                                                                                                                @{ Name = 'InfoBase';    Expression = { @{ Descr = $lock.Connection.InfoBase.Descr; Name = $lock.Connection.InfoBase.Name } } },
+                                                                                                                @{ Name = 'SessionID';   Expression = { $lock.Connection.SessionID } },
+                                                                                                                @{ Name = 'Process';     Expression = { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $lock.Connection.Process.AvailablePerfomance } },
+                                                                                                                                                                @{ Name = 'AvgBackCallTime';     Expression = { $lock.Connection.Process.AvgBackCallTime } },
+                                                                                                                                                                @{ Name = 'AvgCallTime';         Expression = { $lock.Connection.Process.AvgCallTime } },
+                                                                                                                                                                @{ Name = 'AvgDBCallTime';       Expression = { $lock.Connection.Process.AvgDBCallTime } },
+                                                                                                                                                                @{ Name = 'AvgLockCallTime';     Expression = { $lock.Connection.Process.AvgLockCallTime } },
+                                                                                                                                                                @{ Name = 'AvgServerCallTime';   Expression = { $lock.Connection.Process.AvgServerCallTime } },
+                                                                                                                                                                @{ Name = 'AvgThreads';          Expression = { $lock.Connection.Process.AvgThreads } },
+                                                                                                                                                                @{ Name = 'Capacity';            Expression = { $lock.Connection.Process.Capacity } },
+                                                                                                                                                                @{ Name = 'Connections';         Expression = { $lock.Connection.Process.Connections } },
+                                                                                                                                                                @{ Name = 'HostName';            Expression = { $lock.Connection.Process.HostName } },
+                                                                                                                                                                @{ Name = 'IsEnable';            Expression = { $lock.Connection.Process.IsEnable } },
+                                                                                                                                                                @{ Name = 'License';             Expression = { try { $lock.Connection.Process.License.FullPresentation } catch { $null } } },
+                                                                                                                                                                @{ Name = 'MainPort';            Expression = { $lock.Connection.Process.MainPort } },
+                                                                                                                                                                @{ Name = 'MemoryExcessTime';    Expression = { $lock.Connection.Process.MemoryExcessTime } },
+                                                                                                                                                                @{ Name = 'MemorySize';          Expression = { $lock.Connection.Process.MemorySize } },
+                                                                                                                                                                @{ Name = 'PID';                 Expression = { $lock.Connection.Process.PID } },
+                                                                                                                                                                @{ Name = 'Running';             Expression = { $lock.Connection.Process.Running } },
+                                                                                                                                                                @{ Name = 'SelectionSize';       Expression = { $lock.Connection.Process.SelectionSize } },
+                                                                                                                                                                @{ Name = 'StartedAt';           Expression = { $lock.Connection.Process.Process.StartedAt } },
+                                                                                                                                                                @{ Name = 'Use';                 Expression = { $lock.Connection.Process.Use } } } } } } },
+                                                          @{ Name = 'LockDescr'; Expression = { $lock.LockDescr } },
+                                                          @{ Name = 'LockedAt';  Expression = { $lock.LockedAt } },
+                                                          @{ Name = 'Object';    Expression = { $lock.Object } },
+                                                          @{ Name = 'Session';   Expression = { 1| Select-Object @{ Name = 'AppID';                Expression = { $lock.Session.AppID } },
+                                                                                                        @{ Name = 'blockedByDBMS';                 Expression = { $lock.Session.blockedByDBMS } },
+                                                                                                        @{ Name = 'blockedByLS';                   Expression = { $lock.Session.blockedByLS } },
+                                                                                                        @{ Name = 'bytesAll';                      Expression = { $lock.Session.bytesAll } },
+                                                                                                        @{ Name = 'callsAll';                      Expression = { $lock.Session.callsAll } },
+                                                                                                        @{ Name = 'callsLast5Min';                 Expression = { $lock.Session.callsLast5Min } },
+                                                                                                        @{ Name = 'bytesAll';                      Expression = { $lock.Session.bytesAll } },
+                                                                                                        @{ Name = 'bytesLast5Min';                 Expression = { $lock.Session.bytesLast5Min } },
+                                                                                                        @{ Name = 'dbmsBytesAll';                  Expression = { $lock.Session.dbmsBytesAll } },
+                                                                                                        @{ Name = 'dbmsBytesLast5Min';             Expression = { $lock.Session.dbmsBytesLast5Min } },
+                                                                                                        @{ Name = 'dbProcInfo';                    Expression = { $lock.Session.dbProcInfo } },
+                                                                                                        @{ Name = 'dbProcTook';                    Expression = { $lock.Session.dbProcTook } },
+                                                                                                        @{ Name = 'dbProcTookAt';                  Expression = { $lock.Session.dbProcTookAt } },
+                                                                                                        @{ Name = 'durationAll';                   Expression = { $lock.Session.durationAll } },
+                                                                                                        @{ Name = 'durationAllDBMS';               Expression = { $lock.Session.durationAllDBMS } },
+                                                                                                        @{ Name = 'durationCurrent';               Expression = { $lock.Session.durationCurrent } },
+                                                                                                        @{ Name = 'durationCurrentDBMS';           Expression = { $lock.Session.durationCurrentDBMS } },
+                                                                                                        @{ Name = 'durationLast5Min';              Expression = { $lock.Session.durationLast5Min } },
+                                                                                                        @{ Name = 'durationLast5MinDBMS';          Expression = { $lock.Session.durationLast5MinDBMS } },
+                                                                                                        @{ Name = 'Hibernate';                     Expression = { $lock.Session.Hibernate } },
+                                                                                                        @{ Name = 'HibernateSessionTerminateTime'; Expression = { $lock.Session.HibernateSessionTerminateTime } },
+                                                                                                        @{ Name = 'Host';                          Expression = { $lock.Session.Host } },
+                                                                                                        @{ Name = 'InBytesAll';                    Expression = { $lock.Session.InBytesAll } },
+                                                                                                        @{ Name = 'InBytesCurrent';                Expression = { $lock.Session.InBytesCurrent } },
+                                                                                                        @{ Name = 'InBytesLast5Min';               Expression = { $lock.Session.InBytesLast5Min } },
+                                                                                                        @{ Name = 'InfoBase';                      Expression = { @{ Descr = $lock.Session.InfoBase.Descr; Name = $lock.Session.InfoBase.Name } } },
+                                                                                                        @{ Name = 'LastActiveAt';                  Expression = { $lock.Session.LastActiveAt } },
+                                                                                                        @{ Name = 'License';                       Expression = { try { $lock.Session.Process.License.FullPresentation } catch { $null } } },
+                                                                                                        @{ Name = 'Locale';                        Expression = { $lock.Session.Locale } },
+                                                                                                        @{ Name = 'MemoryAll';                     Expression = { $lock.Session.MemoryAll } },
+                                                                                                        @{ Name = 'MemoryCurrent';                 Expression = { $lock.Session.MemoryCurrent } },
+                                                                                                        @{ Name = 'MemoryLast5Min';                Expression = { $lock.Session.MemoryLast5Min } },
+                                                                                                        @{ Name = 'OutBytesAll';                   Expression = { $lock.Session.OutBytesAll } },
+                                                                                                        @{ Name = 'OutBytesCurrent';               Expression = { $lock.Session.OutBytesCurrent } },
+                                                                                                        @{ Name = 'OutBytesLast5Min';              Expression = { $lock.Session.OutBytesLast5Min } },
+                                                                                                        @{ Name = 'PassiveSessionHibernateTime';   Expression = { $lock.Session.PassiveSessionHibernateTime } },
+                                                                                                        @{ Name = 'ISessionInfo';                  Expression = { $lock.Session.ISessionInfo } },
+                                                                                                        @{ Name = 'StartedAt';                     Expression = { $lock.Session.StartedAt } },
+                                                                                                        @{ Name = 'UserName';                      Expression = { $lock.Session.UserName } },
+                                                                                                        @{ Name = 'Process'; Expression = { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $lock.Session.Process.AvailablePerfomance } },
+                                                                                                                                                              @{ Name = 'AvgBackCallTime';     Expression = { $lock.Session.Process.AvgBackCallTime } },
+                                                                                                                                                              @{ Name = 'AvgCallTime';         Expression = { $lock.Session.Process.AvgCallTime } },
+                                                                                                                                                              @{ Name = 'AvgDBCallTime';       Expression = { $lock.Session.Process.AvgDBCallTime } },
+                                                                                                                                                              @{ Name = 'AvgLockCallTime';     Expression = { $lock.Session.Process.AvgLockCallTime } },
+                                                                                                                                                              @{ Name = 'AvgServerCallTime';   Expression = { $lock.Session.Process.AvgServerCallTime } },
+                                                                                                                                                              @{ Name = 'AvgThreads';          Expression = { $lock.Session.Process.AvgThreads } },
+                                                                                                                                                              @{ Name = 'Capacity';            Expression = { $lock.Session.Process.Capacity } },
+                                                                                                                                                              @{ Name = 'Connections';         Expression = { $lock.Session.Process.Connections } },
+                                                                                                                                                              @{ Name = 'HostName';            Expression = { $lock.Session.Process.HostName } },
+                                                                                                                                                              @{ Name = 'IsEnable';            Expression = { $lock.Session.Process.IsEnable } },
+                                                                                                                                                              @{ Name = 'License';             Expression = { try { $lock.Session.Process.License.FullPresentation } catch { $null } } },
+                                                                                                                                                              @{ Name = 'MainPort';            Expression = { $lock.Session.Process.MainPort   } },
+                                                                                                                                                              @{ Name = 'MemoryExcessTime';    Expression = { $lock.Session.Process.MemoryExcessTime } },
+                                                                                                                                                              @{ Name = 'MemorySize';          Expression = { $lock.Session.Process.MemorySize } },
+                                                                                                                                                              @{ Name = 'PID';                 Expression = { $lock.Session.Process.PID } },
+                                                                                                                                                              @{ Name = 'Running';             Expression = { $lock.Session.Process.Running } },
+                                                                                                                                                              @{ Name = 'SelectionSize';       Expression = { $lock.Session.Process.SelectionSize } },
+                                                                                                                                                              @{ Name = 'StartedAt';           Expression = { $lock.Session.Process.Process.StartedAt } },
+                                                                                                                                                              @{ Name = 'Use';                 Expression = { $lock.Session.Process.Use } }} },
+                                                                                                        @{ Name = 'Connection'; Expression = { 1 | Select-Object @{ Name = 'Application'; Expression = { $lock.Session.Application } },
+                                                                                                                                                                 @{ Name = 'blockedByLS'; Expression = { $lock.Session.blockedByLS } },
+                                                                                                                                                                 @{ Name = 'ConnectedAt'; Expression = { $lock.Session.ConnectedAt } },
+                                                                                                                                                                 @{ Name = 'ConnID';      Expression = { $lock.Session.ConnID } },
+                                                                                                                                                                 @{ Name = 'Host';        Expression = { $lock.Session.Host } },
+                                                                                                                                                                 @{ Name = 'InfoBase';    Expression = { @{ Descr = $lock.Session.InfoBase.Descr; Name = $lock.Session.InfoBase.Name } } },
+                                                                                                                                                                 @{ Name = 'SessionID';   Expression = { $lock.Session.SessionID } },
+                                                                                                                                                                 @{ Name = 'Process';     Expression = { 1 | Select-Object   @{ Name = 'AvailablePerfomance'; Expression = { $lock.Session.Process.AvailablePerfomance } },
+                                                                                                                                                                                                                             @{ Name = 'AvgBackCallTime';     Expression = { $lock.Session.Process.AvgBackCallTime } },
+                                                                                                                                                                                                                             @{ Name = 'AvgCallTime';         Expression = { $lock.Session.Process.AvgCallTime } },
+                                                                                                                                                                                                                             @{ Name = 'AvgDBCallTime';       Expression = { $lock.Session.Process.AvgDBCallTime } },
+                                                                                                                                                                                                                             @{ Name = 'AvgLockCallTime';     Expression = { $lock.Session.Process.AvgLockCallTime } },
+                                                                                                                                                                                                                             @{ Name = 'AvgServerCallTime';   Expression = { $lock.Session.Process.AvgServerCallTime } },
+                                                                                                                                                                                                                             @{ Name = 'AvgThreads';          Expression = { $lock.Session.Process.AvgThreads } },
+                                                                                                                                                                                                                             @{ Name = 'Capacity';            Expression = { $lock.Session.Process.Capacity } },
+                                                                                                                                                                                                                             @{ Name = 'Connections';         Expression = { $lock.Session.Process.Connections } },
+                                                                                                                                                                                                                             @{ Name = 'HostName';            Expression = { $lock.Session.Process.HostName } },
+                                                                                                                                                                                                                             @{ Name = 'IsEnable';            Expression = { $lock.Session.Process.IsEnable } },
+                                                                                                                                                                                                                             @{ Name = 'License';             Expression = { try { $lock.Session.Process.License.FullPresentation } catch { $null } } },
+                                                                                                                                                                                                                             @{ Name = 'MainPort';            Expression = { $lock.Session.Process.MainPort   } },
+                                                                                                                                                                                                                             @{ Name = 'MemoryExcessTime';    Expression = { $lock.Session.Process.MemoryExcessTime } },
+                                                                                                                                                                                                                             @{ Name = 'MemorySize';          Expression = { $lock.Session.Process.MemorySize } },
+                                                                                                                                                                                                                             @{ Name = 'PID';                 Expression = { $lock.Session.Process.PID } },
+                                                                                                                                                                                                                             @{ Name = 'Running';             Expression = { $lock.Session.Process.Running } },
+                                                                                                                                                                                                                             @{ Name = 'SelectionSize';       Expression = { $lock.Session.Process.SelectionSize } },
+                                                                                                                                                                                                                             @{ Name = 'StartedAt';           Expression = { $lock.Session.Process.Process.StartedAt } },
+                                                                                                                                                                                                                             @{ Name = 'Use';                 Expression = { $lock.Session.Process.Use } } } } } } } }
+                        }
+
+                        Add-Member -InputObject $objCC[$objCC.Count-1] -Name ConnectionLocks -Value $objLock -MemberType NoteProperty
+
+                    }             
+
+                    Add-Member -InputObject $cls -Name Connections -Value $objCC -MemberType NoteProperty
+
+                    $infoBases = $connection.GetInfoBases( $cluster )
+                    $objInfoBases = @()
+                    foreach( $infoBase in $infoBases ) {
+    
+                        $objInfoBases += 1| Select-Object @{ Name = 'Descr'; Expression =  { $infoBase.InfoBase.Descr } },
+                                                          @{ Name = 'Name';  Expression = { $infoBase.InfoBase.Name } }
+                        
+                        $infoBaseSessions = $connection.GetInfoBaseSessions( $cluster, $infoBase )
+                        $objInfoBaseSession = @()
+                        foreach( $ibSession in $infoBaseSessions ) {
+                            $objInfoBaseSession += 1| Select-Object @{ Name = 'AppID';                         Expression = { $ibSession.AppID } },
+                                                                    @{ Name = 'blockedByDBMS';                 Expression = { $ibSession.blockedByDBMS } },
+                                                                    @{ Name = 'blockedByLS';                   Expression = { $ibSession.blockedByLS } },
+                                                                    @{ Name = 'bytesAll';                      Expression = { $ibSession.bytesAll } },
+                                                                    @{ Name = 'bytesLast5Min';                 Expression = { $ibSession.bytesLast5Min } },
+                                                                    @{ Name = 'callsAll';                      Expression = { $ibSession.callsAll } },
+                                                                    @{ Name = 'callsLast5Min';                 Expression = { $ibSession.callsLast5Min } },
+                                                                    @{ Name = 'dbmsBytesAll';                  Expression = { $ibSession.dbmsBytesAll } },
+                                                                    @{ Name = 'dbmsBytesLast5Min';             Expression = { $ibSession.dbmsBytesLast5Min } },
+                                                                    @{ Name = 'dbProcInfo';                    Expression = { $ibSession.dbProcInfo } },
+                                                                    @{ Name = 'dbProcTook';                    Expression = { $ibSession.dbProcTook } },
+                                                                    @{ Name = 'dbProcTookAt';                  Expression = { $ibSession.dbProcTookAt } },
+                                                                    @{ Name = 'durationAll';                   Expression = { $ibSession.durationAll } },
+                                                                    @{ Name = 'durationAllDBMS';               Expression = { $ibSession.durationAllDBMS } },
+                                                                    @{ Name = 'durationCurrent';               Expression = { $ibSession.durationCurrent } },
+                                                                    @{ Name = 'durationCurrentDBMS';           Expression = { $ibSession.durationCurrentDBMS } },
+                                                                    @{ Name = 'durationLast5Min';              Expression = { $ibSession.durationLast5Min } },
+                                                                    @{ Name = 'durationLast5MinDBMS';          Expression = { $ibSession.durationLast5MinDBMS } },
+                                                                    @{ Name = 'Hibernate';                     Expression = { $ibSession.Hibernate } },
+                                                                    @{ Name = 'HibernateSessionTerminateTime'; Expression = { $ibSession.HibernateSessionTerminateTime } },
+                                                                    @{ Name = 'Host';                          Expression = { $ibSession.Host } },
+                                                                    @{ Name = 'InBytesAll';                    Expression = { $ibSession.InBytesAll } },
+                                                                    @{ Name = 'InBytesCurrent';                Expression = { $ibSession.InBytesCurrent } },
+                                                                    @{ Name = 'InBytesLast5Min';               Expression = { $ibSession.InBytesLast5Min } },
+                                                                    @{ Name = 'InfoBase';                      Expression = { @{ Descr = $ibSession.InfoBase.Descr; Name = $ibSession.InfoBase.Name } } },
+                                                                    @{ Name = 'LastActiveAt';                  Expression = { $ibSession.LastActiveAt } },
+                                                                    @{ Name = 'License';                       Expression = { try { $ibSession.Process.License.FullPresentation } catch { $null } } },
+                                                                    @{ Name = 'Locale';                        Expression = { $ibSession.Locale } },
+                                                                    @{ Name = 'MemoryAll';                     Expression = { $ibSession.MemoryAll } },
+                                                                    @{ Name = 'MemoryCurrent';                 Expression = { $ibSession.MemoryCurrent } },
+                                                                    @{ Name = 'MemoryLast5Min';                Expression = { $ibSession.MemoryLast5Min } },
+                                                                    @{ Name = 'OutBytesAll';                   Expression = { $ibSession.OutBytesAll } },
+                                                                    @{ Name = 'OutBytesCurrent';               Expression = { $ibSession.OutBytesCurrent } },
+                                                                    @{ Name = 'OutBytesLast5Min';              Expression = { $ibSession.OutBytesLast5Min } },
+                                                                    @{ Name = 'PassiveSessionHibernateTime';   Expression = { $ibSession.PassiveSessionHibernateTime } },
+                                                                    @{ Name = 'ISessionInfo';                  Expression = { $ibSession.ISessionInfo } },
+                                                                    @{ Name = 'StartedAt';                     Expression = { $ibSession.StartedAt } },
+                                                                    @{ Name = 'UserName';                      Expression = { $ibSession.UserName } },
+                                                                    @{ Name = 'Process'; Expression = { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $ibSession.Process.AvailablePerfomance } },
+                                                                                                                          @{ Name = 'AvgBackCallTime';     Expression = { $ibSession.Process.AvgBackCallTime } },
+                                                                                                                          @{ Name = 'AvgCallTime';         Expression = { $ibSession.Process.AvgCallTime } },
+                                                                                                                          @{ Name = 'AvgDBCallTime';       Expression = { $ibSession.Process.AvgDBCallTime } },
+                                                                                                                          @{ Name = 'AvgLockCallTime';     Expression = { $ibSession.Process.AvgLockCallTime } },
+                                                                                                                          @{ Name = 'AvgServerCallTime';   Expression = { $ibSession.Process.AvgServerCallTime } },
+                                                                                                                          @{ Name = 'AvgThreads';          Expression = { $ibSession.Process.AvgThreads } },
+                                                                                                                          @{ Name = 'Capacity';            Expression = { $ibSession.Process.Capacity } },
+                                                                                                                          @{ Name = 'Connections';         Expression = { $ibSession.Process.Connections } },
+                                                                                                                          @{ Name = 'HostName';            Expression = { $ibSession.Process.HostName } },
+                                                                                                                          @{ Name = 'IsEnable';            Expression = { $ibSession.Process.IsEnable } },
+                                                                                                                          @{ Name = 'License';             Expression = { try { $ibSession.Process.License.FullPresentation } catch { $null } } },
+                                                                                                                          @{ Name = 'MainPort';            Expression = { $ibSession.Process.MainPort   } },
+                                                                                                                          @{ Name = 'MemoryExcessTime';    Expression = { $ibSession.Process.MemoryExcessTime } },
+                                                                                                                          @{ Name = 'MemorySize';          Expression = { $ibSession.Process.MemorySize } },
+                                                                                                                          @{ Name = 'PID';                 Expression = { $ibSession.Process.PID } },
+                                                                                                                          @{ Name = 'Running';             Expression = { $ibSession.Process.Running } },
+                                                                                                                          @{ Name = 'SelectionSize';       Expression = { $ibSession.Process.SelectionSize } },
+                                                                                                                          @{ Name = 'StartedAt';           Expression = { $ibSession.Process.Process.StartedAt } },
+                                                                                                                          @{ Name = 'Use';                 Expression = { $ibSession.Process.Use } }} },
+                                                                    @{ Name = 'Connection'; Expression = { 1 | Select-Object @{ Name = 'Application'; Expression = { $ibSession.Application } },
+                                                                                                                             @{ Name = 'blockedByLS'; Expression = { $ibSession.blockedByLS } },
+                                                                                                                             @{ Name = 'ConnectedAt'; Expression = { $ibSession.ConnectedAt } },
+                                                                                                                             @{ Name = 'ConnID';      Expression = { $ibSession.ConnID } },
+                                                                                                                             @{ Name = 'Host';        Expression = { $ibSession.Host } },
+                                                                                                                             @{ Name = 'InfoBase';    Expression = { @{ Descr = $ibSession.InfoBase.Descr; Name = $ibSession.InfoBase.Name } } },
+                                                                                                                             @{ Name = 'SessionID';   Expression = { $ibSession.SessionID } },
+                                                                                                                             @{ Name = 'Process';     Expression = { 1 | Select-Object   @{ Name = 'AvailablePerfomance'; Expression = { $ibSession.Process.AvailablePerfomance } },
+                                                                                                                                                                                         @{ Name = 'AvgBackCallTime';     Expression = { $ibSession.Process.AvgBackCallTime } },
+                                                                                                                                                                                         @{ Name = 'AvgCallTime';         Expression = { $ibSession.Process.AvgCallTime } },
+                                                                                                                                                                                         @{ Name = 'AvgDBCallTime';       Expression = { $ibSession.Process.AvgDBCallTime } },
+                                                                                                                                                                                         @{ Name = 'AvgLockCallTime';     Expression = { $ibSession.Process.AvgLockCallTime } },
+                                                                                                                                                                                         @{ Name = 'AvgServerCallTime';   Expression = { $ibSession.Process.AvgServerCallTime } },
+                                                                                                                                                                                         @{ Name = 'AvgThreads';          Expression = { $ibSession.Process.AvgThreads } },
+                                                                                                                                                                                         @{ Name = 'Capacity';            Expression = { $ibSession.Process.Capacity } },
+                                                                                                                                                                                         @{ Name = 'Connections';         Expression = { $ibSession.Process.Connections } },
+                                                                                                                                                                                         @{ Name = 'HostName';            Expression = { $ibSession.Process.HostName } },
+                                                                                                                                                                                         @{ Name = 'IsEnable';            Expression = { $ibSession.Process.IsEnable } },
+                                                                                                                                                                                         @{ Name = 'License';             Expression = { try { $ibSession.Process.License.FullPresentation } catch { $null } } },
+                                                                                                                                                                                         @{ Name = 'MainPort';            Expression = { $ibSession.Process.MainPort   } },
+                                                                                                                                                                                         @{ Name = 'MemoryExcessTime';    Expression = { $ibSession.Process.MemoryExcessTime } },
+                                                                                                                                                                                         @{ Name = 'MemorySize';          Expression = { $ibSession.Process.MemorySize } },
+                                                                                                                                                                                         @{ Name = 'PID';                 Expression = { $ibSession.Process.PID } },
+                                                                                                                                                                                         @{ Name = 'Running';             Expression = { $ibSession.Process.Running } },
+                                                                                                                                                                                         @{ Name = 'SelectionSize';       Expression = { $ibSession.Process.SelectionSize } },
+                                                                                                                                                                                         @{ Name = 'StartedAt';           Expression = { $ibSession.Process.Process.StartedAt } },
+                                                                                                                                                                                         @{ Name = 'Use';                 Expression = { $ibSession.Process.Use } }} }} }
+                        }
+
+                        Add-Member -InputObject $objInfoBases[$objInfoBases.Count-1] -Name InfoBaseSessions -Value $objInfoBaseSession -MemberType NoteProperty
+
+                    }
+
+                    Add-Member -InputObject $cls -Name InfoBases -Value $objInfoBases -MemberType NoteProperty
+
+                }
+
+                $obj.Clusters += $cls
+                $result += $obj
+                
+            }
+
+        }
+
+        $result
+
+    }
+
+    End {
+
+        $connector = $null
+    
     }
 
 }
@@ -758,7 +1181,7 @@ function Get-NetHaspDirectoryPath
    Путь к каталогу с библиотекой hsmon.dll
 #>
 {  
-    (Get-Module 1CHelper).Path.Replace("\1CHelper.psm1", "")
+    (Get-Module 1CHelper).Path.TrimEnd('1CHelper.psm1') + "hasp"
 }
 
 function Get-NetHaspIniFilePath
@@ -1173,7 +1596,7 @@ function Invoke-NetHasp
        [Parameter(Mandatory = $False)]
        [Int]$HSMON_SCAN_TIMEOUT = 30,
        [Parameter(Mandatory = $False)]
-       [Switch]$NoJSON = $true
+       [Switch]$JSON = $false
     );
 
     # Set default values from '1CHelper' module
@@ -1332,7 +1755,7 @@ function Invoke-NetHasp
                  $ObjectProperties = @("SERVERNAME", "SERVERID", "MA", "SLOT", "INDEX", "NAME");
               }
            }
-           if ( -not $NoJSON ) {
+           if ( $JSON ) {
             Write-Verbose "$(Get-Date) Generating LLD JSON";
             $Result =  Get-NetHaspJSON <#Make-JSON#> -InputObject $Objects -ObjectProperties $ObjectProperties -Pretty;
            } else {
@@ -1453,7 +1876,7 @@ function Invoke-UsbHasp
        [Parameter(Mandatory = $False)]
        [String]$ErrorCode = '-127',
        [Parameter(Mandatory = $False)]
-       [Switch]$NoJSON = $true
+       [Switch]$JSON = $false
     );
 
     # split key
@@ -1489,7 +1912,7 @@ function Invoke-UsbHasp
        'Discovery' {
           Write-Verbose "$(Get-Date) Generating LLD JSON";
           $ObjectProperties = @("NAME", "PNPDEVICEID");
-          if ( -not $NoJSON ) {
+          if ( $JSON ) {
             $Result = Make-JSON -InputObject $Objects -ObjectProperties $ObjectProperties -Pretty;
           } else {
             $Result = $Objects
@@ -1520,3 +1943,5 @@ function Invoke-UsbHasp
 <# END
 https://github.com/zbx-sadman
 #>
+
+Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1CServersStatistics, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp

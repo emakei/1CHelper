@@ -557,10 +557,10 @@ function Find-1C8conn
     
 }
 
-function Get-1CclusterData
+function Get-ClusterData
 <#
 .Synopsis
-    Собирает статистику использования лицензий по серверам (не ниже 8.3)
+    Собирает информацию с кластеров 1С
 
 .DESCRIPTION
 
@@ -585,44 +585,44 @@ function Get-1CclusterData
     $stat = $hostsToQuery | % { Get-1CclusterData $_ -Verbose }
 
 .OUTPUTS
-    Статистика
+    Данные кластера
 #>
 {
-    [OutputType([Object[]])]
-    [CmdletBinding()]
-    Param(
-        # Адрес хоста для сбора статистики
-        [string]$HostName,
-        # верия компоненты
-        [ValidateSet(2, 3, 4)]
-        [int]$Version=3,
-        # имя админитратора кластера
-        [string]$User="",
-        # пароль администратора кластера
-        [string]$Password="",
-        # не получать инфорацию об администраторах кластера
-        [switch]$NoClusterAdmins=$false,
-        # не получать инфорацию о менеджерах кластера
-        [switch]$NoClusterManagers=$false,
-        # не получать инфорацию о рабочих серверах
-        [switch]$NoWorkingServers=$false,
-        # не получать инфорацию о рабочих процессах
-        [switch]$NoWorkingProcesses=$false,
-        # не получать инфорацию о сервисах кластера
-        [switch]$NoClusterServices=$false,
-        # Получать информацию о соединениях только для кластера, везде или вообще не получать
-        [ValidateSet('None', 'Cluster', 'Everywhere')]
-        [string]$ShowConnections='Everywhere',
-        # Получать информацию о сессиях только для кластера, везде или вообще не получать
-        [ValidateSet('None', 'Cluster', 'Everywhere')]
-        [string]$ShowSessions='Everywhere',
-        # Получать информацию о блокировках только для кластера, везде или вообще не получать
-        [ValidateSet('None', 'Cluster', 'Everywhere')]
-        [string]$ShowLocks='Everywhere',
-        # не получать инфорацию об информационных базах
-        [switch]$NoInfobases=$false,
-        # не получать инфорацию о требованиях назначения
-        [switch]$NoAssignmentRules=$false
+[OutputType([Object[]])]
+[CmdletBinding()]
+Param(
+    # Адрес хоста для сбора статистики
+    [string]$HostName,
+    # имя админитратора кластера
+    [string]$User="",
+    # пароль администратора кластера
+    [string]$Password="",
+    # не получать инфорацию об администраторах кластера
+    [switch]$NoClusterAdmins=$false,
+    # не получать инфорацию о менеджерах кластера
+    [switch]$NoClusterManagers=$false,
+    # не получать инфорацию о рабочих серверах
+    [switch]$NoWorkingServers=$false,
+    # не получать инфорацию о рабочих процессах
+    [switch]$NoWorkingProcesses=$false,
+    # не получать инфорацию о сервисах кластера
+    [switch]$NoClusterServices=$false,
+    # Получать информацию о соединениях только для кластера, везде или вообще не получать
+    [ValidateSet('None', 'Cluster', 'Everywhere')]
+    [string]$ShowConnections='Everywhere',
+    # Получать информацию о сессиях только для кластера, везде или вообще не получать
+    [ValidateSet('None', 'Cluster', 'Everywhere')]
+    [string]$ShowSessions='Everywhere',
+    # Получать информацию о блокировках только для кластера, везде или вообще не получать
+    [ValidateSet('None', 'Cluster', 'Everywhere')]
+    [string]$ShowLocks='Everywhere',
+    # не получать инфорацию об информационных базах
+    [switch]$NoInfobases=$false,
+    # не получать инфорацию о требованиях назначения
+    [switch]$NoAssignmentRules=$false,
+    # верия компоненты
+    [ValidateSet(2, 3, 4)]
+    [int]$Version=3
     )
 
 Begin {
@@ -636,7 +636,9 @@ Process {
                             , @{ name = 'Clusters'; Expression = {  @() } }
 
     try {
+        Write-Verbose "Подключение к '$HostName'"
         $connection = $connector.ConnectAgent( $HostName )
+        $abort = $false
     } catch {
         Write-Warning $_
         $obj.Error = $_.Exception.Message
@@ -661,12 +663,14 @@ Process {
                                     , @{ name = 'MaxMemoryTimeLimit';         Expression = { $cluster.MaxMemoryTimeLimit } }`
                                     , @{ name = 'SecurityLevel';              Expression = { $cluster.SecurityLevel } }`
                                     , @{ name = 'SessionFaultToleranceLevel'; Expression = { $cluster.SessionFaultToleranceLevel } }`
-                                    , @{ name = 'Error'; Expression = {} }
+                                    , @{ name = 'Error';                      Expression = {} }
 
             Write-Verbose "Получение информации кластера `"$($cluster.ClusterName)`" на `"$($cluster.HostName)`""
                 
             try {
+                Write-Verbose "Аутентификация в кластере $($cluster.HostName,':',$cluster.MainPort,' - ',$cluster.ClusterName)"
                 $connection.Authenticate( $cluster, $User, $Password )
+                $abort = $false
             } catch {
                 Write-Warning $_
                 $cls.Error = $_.Exception.Message
@@ -912,7 +916,7 @@ Process {
                                                                                                             @{ Name = 'OutBytesCurrent';               Expression = { $lock.Session.OutBytesCurrent } },
                                                                                                             @{ Name = 'OutBytesLast5Min';              Expression = { $lock.Session.OutBytesLast5Min } },
                                                                                                             @{ Name = 'PassiveSessionHibernateTime';   Expression = { $lock.Session.PassiveSessionHibernateTime } },
-                                                                                                            @{ Name = 'ISessionInfo';                  Expression = { $lock.Session.ISessionInfo } },
+                                                                                                            @{ Name = 'SessionID';                     Expression = { $lock.Session.SessionID } },
                                                                                                             @{ Name = 'StartedAt';                     Expression = { $lock.Session.StartedAt } },
                                                                                                             @{ Name = 'UserName';                      Expression = { $lock.Session.UserName } },
                                                                                                             @{ Name = 'Process'; Expression = { if ( -not $NoWorkingProcesses ) { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $lock.Session.Process.AvailablePerfomance } },
@@ -1023,7 +1027,7 @@ Process {
                                                                         @{ Name = 'OutBytesCurrent';               Expression = { $ibSession.OutBytesCurrent } },
                                                                         @{ Name = 'OutBytesLast5Min';              Expression = { $ibSession.OutBytesLast5Min } },
                                                                         @{ Name = 'PassiveSessionHibernateTime';   Expression = { $ibSession.PassiveSessionHibernateTime } },
-                                                                        @{ Name = 'ISessionInfo';                  Expression = { $ibSession.ISessionInfo } },
+                                                                        @{ Name = 'SessionID';                     Expression = { $ibSession.SessionID } },
                                                                         @{ Name = 'StartedAt';                     Expression = { $ibSession.StartedAt } },
                                                                         @{ Name = 'UserName';                      Expression = { $ibSession.UserName } },
                                                                         @{ Name = 'Process'; Expression = { if ( -not $NoWorkingProcesses ) { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $ibSession.Process.AvailablePerfomance } },
@@ -1148,7 +1152,7 @@ Process {
                                                                                                             @{ Name = 'OutBytesCurrent';               Expression = { $ibLock.Session.OutBytesCurrent } },
                                                                                                             @{ Name = 'OutBytesLast5Min';              Expression = { $ibLock.Session.OutBytesLast5Min } },
                                                                                                             @{ Name = 'PassiveSessionHibernateTime';   Expression = { $ibLock.Session.PassiveSessionHibernateTime } },
-                                                                                                            @{ Name = 'ISessionInfo';                  Expression = { $ibLock.Session.ISessionInfo } },
+                                                                                                            @{ Name = 'SessionID';                     Expression = { $ibLock.Session.SessionID } },
                                                                                                             @{ Name = 'StartedAt';                     Expression = { $ibLock.Session.StartedAt } },
                                                                                                             @{ Name = 'UserName';                      Expression = { $ibLock.Session.UserName } },
                                                                                                             @{ Name = 'Process'; Expression = { if ( -not $NoWorkingProcesses ) { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $ibLock.Session.Process.AvailablePerfomance } },
@@ -1313,7 +1317,7 @@ Process {
                                                                                                     @{ Name = 'OutBytesCurrent';               Expression = { $clLock.Session.OutBytesCurrent } },
                                                                                                     @{ Name = 'OutBytesLast5Min';              Expression = { $clLock.Session.OutBytesLast5Min } },
                                                                                                     @{ Name = 'PassiveSessionHibernateTime';   Expression = { $clLock.Session.PassiveSessionHibernateTime } },
-                                                                                                    @{ Name = 'ISessionInfo';                  Expression = { $clLock.Session.ISessionInfo } },
+                                                                                                    @{ Name = 'SessionID';                     Expression = { $clLock.Session.SessionID } },
                                                                                                     @{ Name = 'StartedAt';                     Expression = { $clLock.Session.StartedAt } },
                                                                                                     @{ Name = 'UserName';                      Expression = { $clLock.Session.UserName } },
                                                                                                     @{ Name = 'Process'; Expression = { if ( -not $NoWorkingProcesses ) { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $clLock.Session.Process.AvailablePerfomance } },
@@ -1409,7 +1413,7 @@ Process {
                                                         @{ Name = 'OutBytesCurrent';               Expression = { $clusterSession.OutBytesCurrent } },
                                                         @{ Name = 'OutBytesLast5Min';              Expression = { $clusterSession.OutBytesLast5Min } },
                                                         @{ Name = 'PassiveSessionHibernateTime';   Expression = { $clusterSession.PassiveSessionHibernateTime } },
-                                                        @{ Name = 'ISessionInfo';                  Expression = { $clusterSession.ISessionInfo } },
+                                                        @{ Name = 'SessionID';                     Expression = { $clusterSession.SessionID } },
                                                         @{ Name = 'StartedAt';                     Expression = { $clusterSession.StartedAt } },
                                                         @{ Name = 'UserName';                      Expression = { $clusterSession.UserName } },
                                                         @{ Name = 'Process'; Expression = { if ( -not $NoWorkingProcesses ) { 1 | Select-Object @{ Name = 'AvailablePerfomance'; Expression = { $clusterSession.Process.AvailablePerfomance } },
@@ -1484,19 +1488,53 @@ End {
 
 }
 
-function Remove-1Csession
-<##>
+function Remove-Session
+<#
+.Synopsis
+    Удаляет сеанс с кластера 1с
+
+.DESCRIPTION
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
+.EXAMPLE
+    $data = Get-1CclusterData 1c-cluster.contoso.com -NoClusterAdmins -NoClusterManagers -NoWorkingServers -NoWorkingProcesses -NoClusterServices -ShowConnections None -ShowSessions Cluster -ShowLocks None -NoInfobases -NoAssignmentRules -User Example -Password Example
+    Remove-1Csession -HostName $data.Clusters.HostName -MainPort $data.Clusters.MainPort -User Admin -Password Admin -SessionID 3076 -InfoBaseName TestDB -Verbose -NotCloseConnection
+
+#>
 {
+[CmdletBinding()]
 Param(
-        # Адрес хоста для сбора статистики
+        # Адрес хоста для удаления сеанса
+        [Parameter(Mandatory=$true)]
         [string]$HostName,
-        # верия компоненты
-        [ValidateSet(2, 3, 4)]
-        [int]$Version=3,
-        # имя админитратора кластера
+        # Порт хоста для удаления сеанса
+        [Parameter(Mandatory=$true)]
+        [int]$MainPort,
+        # Имя админитратора кластера
         [string]$User="",
-        # пароль администратора кластера
-        [string]$Password=""
+        # Пароль администратора кластера
+        [string]$Password="",
+        # Порт хоста для удаления сеанса
+        [Parameter(Mandatory=$true)]
+        [int]$SessionID,
+        # Порт хоста для удаления сеанса
+        [Parameter(Mandatory=$true)]
+        [string]$InfoBaseName,
+        # Принудительно закрыть соединение с информационной базой после удаления сеанса
+        [switch]$CloseIbConnection=$false,
+        # Имя админитратора информационной базы
+        [string]$IbUser="",
+        # Пароль администратора информационной базы
+        [string]$IbPassword="",
+        # Версия компоненты
+        [ValidateSet(2, 3, 4)]
+        [int]$Version=3
     )
 
 Begin {
@@ -1504,7 +1542,80 @@ Begin {
     }
 
 Process {
-    #TODO
+
+    try {
+        Write-Verbose "Подключение к '$HostName'"
+        $connection = $connector.ConnectAgent( $HostName )
+        $abort = $false
+    } catch {
+        Write-Warning $_
+        $abort = $true
+    }
+        
+    if ( -not $abort ) {
+            
+        Write-Verbose "Подключен к `"$($connection.ConnectionString)`""
+
+        $clusters = $connection.GetClusters()
+
+        foreach ( $cluster in $clusters ) {
+            
+            if ( $cluster.HostName -ne $HostName -or $cluster.MainPort -ne $MainPort ) { continue }
+
+            try {
+                Write-Verbose "Аутентификация в кластере '$($cluster.HostName,':',$cluster.MainPort,' - ',$cluster.ClusterName)'"
+                $connection.Authenticate( $cluster, $User, $Password )
+                $abort = $false
+            } catch {
+                Write-Warning $_
+                continue
+            }
+
+            $sessions = $connection.GetSessions( $cluster )
+                
+            foreach ( $session in $sessions ) {
+                    
+                if ( $session.InfoBase.Name -ne $InfoBaseName -or $session.SessionID -ne $SessionID ) { continue }
+
+                Write-Verbose "Удаление сеанса '$($session.SessionID,' - ''',$session.UserName,''' с компьютера : ',$session.Host)'"
+                try {
+                    $connection.TerminateSession( $cluster, $session )
+                } catch {
+                    Write-Warning $_
+                    continue
+                }
+                
+                if ( $CloseIbConnection -and $session.Connection ) {
+                    try {
+                        # подключаемся к рабочему процессу
+                        Write-Verbose "Подключение к рабочему процессу '$($session.Process.HostName):$($session.Process.MainPort)'"
+                        $server = $connector.ConnectWorkingProcess( "$($session.Process.HostName):$($session.Process.MainPort)" )
+                        # проходим аутентификацию в информационной базе
+                        Write-Verbose "Аутентификация пользователя инф. базы '$($IbUser)' в информационной базе '$($InfoBaseName)'"
+                        $server.AddAuthentication( $IbUser, $IbPassword )
+                        # отключаем соединение
+                        $ibDesc = $server.CreateInfoBaseInfo()
+                        $ibDesc.Name = $InfoBaseName
+                        $ibConnections = $server.GetInfoBaseConnections( $ibDesc )
+                        foreach ( $ibConnection in $ibConnections ) {
+                            if ( $ibConnection.ConnID -ne $session.connection.ConnID ) { continue } 
+                            # отключение соединения
+                            Write-Verbose "Отключение соединения № '$($ibConnection.ConnID)' приложения '$($ibConnection.AppID)' c компьютера '$($ibConnection.HostName)'"
+                            $server.Disconnect( $ibConnection )
+                        }
+                    } catch {
+                        Write-Warning $_
+                        continue
+                    }
+
+                }
+                
+            }
+
+        }
+
+    }
+            
     }
 
 End {
@@ -2426,4 +2537,4 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1CclusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp
+Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1Session

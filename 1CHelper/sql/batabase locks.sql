@@ -1,7 +1,7 @@
-﻿SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED
 
 DECLARE @dbid AS smallint;
-use [{My Database}];
+
 SET @dbid=DB_ID();
 
 /*кто кого*/
@@ -145,7 +145,7 @@ CASE
  WHEN Mode='UIX' THEN 'UIX = Блокировка обновления с намерением монопольного доступа. Указывает блокировку обновления ресурса с намерением получения монопольных блокировок на подчиненные ресурсы в иерархии блокировок;'
 
  WHEN Mode='BU' THEN 'BU = Блокировка массового обновления. Используется для массовых операций;'
-     --[ ELSE else_result_expression ]
+     ELSE else_result_expression
 END as [Тип блокировки]
 
 ,syspr.spid, syspr.dbid, syspr.open_tran, syspr.status, syspr.hostprocess, syspr.loginame, syspr.hostname

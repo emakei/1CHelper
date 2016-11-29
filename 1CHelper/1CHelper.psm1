@@ -1802,6 +1802,86 @@ function Get-NetHaspIniFilePath
     $pathToStarter.Replace("common\1cestart.exe", "conf\nethasp.ini")
 }
 
+function Invoke-SqlQuery
+<#
+.Synopsis
+   Возвращает результат выполнения запроса к серверу SQL
+
+.DESCRIPTION
+
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+
+
+.EXAMPLE
+    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data Custom -Text 'select @@version'
+
+.EXAMPLE
+    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data DatabaseLocks -Verbose
+
+.EXAMPLE
+    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data CurrentExequtingQueries -Verbose
+
+#>
+{
+Param(
+    [string]$Server='local',
+    [string]$Database='master',
+    [Parameter(Mandatory=$true)]
+    [string]$user,
+    [Parameter(Mandatory=$true)]
+    [string]$password,
+    [Parameter(Mandatory=$true)]
+    [ValidateSet('DatabaseLocks','CurrentExequtingQueries','Custom')]
+    [string]$Data='Custom',
+    [string]$Text
+    )
+
+    switch ( $Data ) {
+        'DatabaseLocks'
+        {
+            $scriptPath = (Get-NetHaspDirectoryPath).TrimEnd('hasp') + 'sql\batabase locks.sql'
+            $sql = Get-Content $scriptPath -ErrorAction Stop
+        }
+        'CurrentExequtingQueries'
+        {
+            $scriptPath = (Get-NetHaspDirectoryPath).TrimEnd('hasp') + 'sql\current executing queries.sql'
+            $sql = Get-Content $scriptPath -ErrorAction Stop
+        }
+        default
+        {
+            $sql = $Text
+        }
+    }
+
+    Write-Verbose "Подключение к 'Server=$Server;Database=$Database;'"
+    $connection = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList "Server=$Server;Database=$Database;Uid=$user;Pwd=$password"
+    try {
+        $connection.Open()
+    } catch {
+        Write-Error $_
+    }
+    $command = New-Object -TypeName System.Data.SqlClient.SqlCommand $sql, $connection -ErrorAction Stop
+
+    $adapter = New-Object -TypeName System.Data.SqlClient.SqlDataAdapter $command
+    $table = New-Object -TypeName System.Data.DataTable
+
+    $rows = $adapter.Fill($table)
+    
+    Write-Verbose "Получено $rows строк(-а)"
+
+    $connection.Close()
+    $connection.Dispose()
+
+    $table
+
+}
+
+
 <# BEGIN
 https://github.com/zbx-sadman
 #>
@@ -2537,4 +2617,4 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1Session
+Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1Session, Invoke-SqlQuery

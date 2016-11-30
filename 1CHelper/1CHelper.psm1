@@ -7,7 +7,7 @@ function Remove-NotUsedObjects
    Удаление элементов конфигурации с синонимом "(не используется)"
 
 .EXAMPLE
-   PS C:\> $modules = Delete-NoUsedTypes E:\TEMP\ExportingConfiguration
+   PS C:\> $modules = Remove-NotUsedObjects E:\TEMP\ExportingConfiguration
    PS C:\> $gr = $modules | group File, Object | select -First 1
    PS C:\> ise ($gr.Group.File | select -First 1) # открываем модуль в новой вкладке ISE
    # альтернатива 'start notepad $gr.Group.File[0]'
@@ -592,11 +592,12 @@ function Get-ClusterData
 [CmdletBinding()]
 Param(
     # Адрес хоста для сбора статистики
+    [Parameter(Mandatory=$true)]
     [string]$HostName,
     # имя админитратора кластера
     [string]$User="",
     # пароль администратора кластера
-    [string]$Password="",
+    [Security.SecureString]$Password="",
     # не получать инфорацию об администраторах кластера
     [switch]$NoClusterAdmins=$false,
     # не получать инфорацию о менеджерах кластера
@@ -669,7 +670,9 @@ Process {
                 
             try {
                 Write-Verbose "Аутентификация в кластере $($cluster.HostName,':',$cluster.MainPort,' - ',$cluster.ClusterName)"
-                $connection.Authenticate( $cluster, $User, $Password )
+                $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+                $PlainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+                $connection.Authenticate( $cluster, $User, $PlainPassword )
                 $abort = $false
             } catch {
                 Write-Warning $_
@@ -1519,7 +1522,7 @@ Param(
         # Имя админитратора кластера
         [string]$User="",
         # Пароль администратора кластера
-        [string]$Password="",
+        [Security.SecureString]$Password="",
         # Порт хоста для удаления сеанса
         [Parameter(Mandatory=$true)]
         [int]$SessionID,
@@ -1564,7 +1567,9 @@ Process {
 
             try {
                 Write-Verbose "Аутентификация в кластере '$($cluster.HostName,':',$cluster.MainPort,' - ',$cluster.ClusterName)'"
-                $connection.Authenticate( $cluster, $User, $Password )
+                $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($Password)
+                $PlainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+                $connection.Authenticate( $cluster, $User, $PlainPassword )
                 $abort = $false
             } catch {
                 Write-Warning $_
@@ -1628,6 +1633,7 @@ function Get-NetHaspIniStrings
 <#
 .Synopsis
    Находит значения параметров в файле nethasp.ini
+
 .DESCRIPTION
 
 .NOTES  
@@ -1824,7 +1830,7 @@ function Invoke-SqlQuery
     Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data DatabaseLocks -Verbose
 
 .EXAMPLE
-    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data CurrentExequtingQueries -Verbose
+    Invoke-SqlQuery -Server test.contoso.com -user admin -password admin -Data CurrentExequtingQueries -Verbose
 
 #>
 {
@@ -1834,7 +1840,7 @@ Param(
     [Parameter(Mandatory=$true)]
     [string]$user,
     [Parameter(Mandatory=$true)]
-    [string]$password,
+    [Security.SecureString]$password,
     [Parameter(Mandatory=$true)]
     [ValidateSet('DatabaseLocks','CurrentExequtingQueries','Custom')]
     [string]$Data='Custom',
@@ -1859,7 +1865,9 @@ Param(
     }
 
     Write-Verbose "Подключение к 'Server=$Server;Database=$Database;'"
-    $connection = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList "Server=$Server;Database=$Database;Uid=$user;Pwd=$password"
+    $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
+    $PlainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+    $connection = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList "Server=$Server;Database=$Database;Uid=$user;Pwd=$PlainPassword"
     try {
         $connection.Open()
     } catch {

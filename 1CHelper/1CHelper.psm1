@@ -1,5 +1,53 @@
 <#
 .Synopsis
+   Извлекает данные из xml-файла выгрузки APDEX
+.DESCRIPTION
+   Производит извлечение данных из xml-файла выгрузки APDEX
+.EXAMPLE
+   Get-APDEX-Data C:\APDEX\rphost_280\2017-05-16 07-02-54.xml
+.EXAMPLE
+   Get-APDEX-Data C:\APDEX\ -Verbose
+#>
+function Get-APDEX-Data
+{
+    [CmdletBinding()]
+    [OutputType([Object[]])]
+    Param
+    (
+        # Имя файла лога
+        [Parameter(Mandatory=$true,
+                   ValueFromPipelineByPropertyName=$true,
+                   Position=0)]
+        $fileName
+    )
+
+    Begin {
+        $xdoc = New-Object System.Xml.XmlDocument
+        $tree = @()
+    }
+
+    Process {
+        Get-ChildItem $fileName -Recurse -File | % {
+            Write-Verbose $_.FullName
+            try {
+                $xdoc.Load($_.FullName)
+                if ($xdoc.HasChildNodes) {
+                    $tree += $xdoc.Performance.KeyOperation
+                }
+            } catch {
+                $Error | % { Write-Error $_ }
+            }
+        }
+    }
+
+    End {
+        $tree
+    }
+   
+}
+
+<#
+.Synopsis
    Извлекает данные из файла лога технологического журнала
 .DESCRIPTION
    Производит извлечение данных из файла лога технологического журнала

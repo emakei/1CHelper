@@ -1,3 +1,52 @@
+<#
+.Synopsis
+   Извлекает данные из файла лога технологического журнала
+.DESCRIPTION
+   Производит извлечение данных из файла лога технологического журнала
+.EXAMPLE
+   Get-TechJournalData C:\LOG\rphost_280\17061412.log
+.EXAMPLE
+   Get-TechJournalData C:\LOG\ -Verbose
+#>
+function Get-TechJournalData
+{
+    [CmdletBinding()]
+    [OutputType([Object[]])]
+    Param
+    (
+        # Имя файла лога
+        [Parameter(Mandatory=$true,
+                   ValueFromPipelineByPropertyName=$true,
+                   Position=0)]
+        $fileName
+    )
+
+    Begin {
+        # Данный шаблон соответствует одной записи журнала 
+        $template = @"
+^(?<line>(?<time>\d\d\:\d\d\.\d{6}\-\d)\,(?<type>\w+)\,(?<level>\d)(\,(?<name>(\w+\:)?\w+)\=(?<value>([\w\-]+|(\"[^"]+\")|(\'[^']+\'))?))+.*)
+"@
+        $regex = New-Object System.Text.RegularExpressions.Regex ($template, [System.Text.RegularExpressions.RegexOptions]::Multiline)
+        $tree = @()
+    }
+
+    Process {
+        Get-ChildItem $fileName -Recurse -File | % {
+            Write-Verbose $_.FullName
+            $rawText = Get-Content $_.FullName -Encoding UTF8 -Raw
+            if ($rawText) {
+                $matches = $regex.Matches($rawText)
+                $tree += $matches
+            }
+        }
+    }
+
+    End {
+        $tree
+    }
+   
+}
+
 function Remove-NotUsedObjects
 <#
 .Synopsis
@@ -2625,4 +2674,4 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery
+Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData

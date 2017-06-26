@@ -8,7 +8,7 @@
 .EXAMPLE
    Get-APDEX-Data C:\APDEX\ -Verbose
 #>
-function Get-APDEX-Data
+function Get-APDEXinfo
 {
     [CmdletBinding()]
     [OutputType([Object[]])]
@@ -53,8 +53,10 @@ function Get-APDEX-Data
    Производит извлечение данных из файла лога технологического журнала
 .EXAMPLE
    Get-TechJournalData C:\LOG\rphost_280\17061412.log
+   $properties = $tree | % { $_.Groups['name'].Captures } | select -Unique
 .EXAMPLE
    Get-TechJournalData C:\LOG\ -Verbose
+   $tree | ? { $_.Groups['name'] -like '*Context*' } | % { $_.Groups['value'] }
 #>
 function Get-TechJournalData
 {

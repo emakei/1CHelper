@@ -73,13 +73,8 @@ function Get-TechJournalData
 
     Begin {
         # Данный шаблон соответствует одной записи журнала
-        <# Не захватывает свойства вида "Context=Форма.ЗаблокироватьДанныеФормыДляРедактирования : Документ.СписаниеНДС.Форма.ФормаДокумента"
         $template = @"
 ^(?<line>(?<time>\d\d\:\d\d\.\d{6}\-\d)\,(?<type>\w+)\,(?<level>\d)(\,(?<name>(\w+\:)?\w+)\=(?<value>([\w\-]+|(\"[^"]+\")|(\'[^']+\'))?))+.*)
-"@
-#>
-        $template = @"
-^(?<line>(?<time>\d\d\:\d\d\.\d{6}\-\d)\,(?<type>\w+)\,(?<level>\d)(\,(?<name>(\w+\:)?\w+)\=(?<value>([^"'\,]+|(\"[^"]+\")|(\'[^']+\'))?))+.*)
 "@
         $regex = New-Object System.Text.RegularExpressions.Regex ($template, [System.Text.RegularExpressions.RegexOptions]::Multiline)
         $tree = @()

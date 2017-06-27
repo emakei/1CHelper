@@ -4,7 +4,7 @@
 .DESCRIPTION
    Производит извлечение данных из xml-файла выгрузки APDEX
 .EXAMPLE
-   Get-APDEX-Data C:\APDEX\rphost_280\2017-05-16 07-02-54.xml
+   Get-APDEX-Data C:\APDEX\2017-05-16 07-02-54.xml
 .EXAMPLE
    Get-APDEX-Data C:\APDEX\ -Verbose
 #>
@@ -56,7 +56,7 @@ function Get-APDEXinfo
    $properties = $tree | % { $_.Groups['name'].Captures } | select -Unique
 .EXAMPLE
    Get-TechJournalData C:\LOG\ -Verbose
-   $tree | ? { $_.Groups['name'] -like '*Context*' } | % { $_.Groups['value'] }
+   $tree | ? { $_.Groups['name'] -like '*Context*' } | % { $_.Groups['value'] } | Select Value -Unique | fl
 #>
 function Get-TechJournalData
 {

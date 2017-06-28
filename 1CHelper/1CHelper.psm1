@@ -1,8 +1,97 @@
 <#
 .Synopsis
+   Преобразует данные файла технологического журнала в таблицу
+.DESCRIPTION
+   Производит извлечение данных из файла(-ов) технологического журнала и преобразует в таблицу
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+.INPUTS
+   Пусть к файлу(-ам) технологического журнала
+.OUTPUTS
+   Массив строк технологического журнала
+.EXAMPLE
+   $table = Get-TechJournalLOGtable 'C:\LOG\rmngr_1908\17062010.log'
+.EXAMPLE
+   $table = Get-TechJournalLOGtable 'C:\LOG\' -Verbose
+#>
+function Get-TechJournalLOGtable
+{
+    [CmdletBinding()]
+    [OutputType([Object[]])]
+    Param
+    (
+        # Имя файла лога
+        [Parameter(Mandatory=$true,
+                   ValueFromPipelineByPropertyName=$true,
+                   Position=0)]
+        $fileName
+    )
+
+    Begin
+    {
+    $table = @()
+    }
+
+    Process
+    {
+
+    Get-ChildItem $fileName -Recurse -File | % {
+        Write-Verbose $_.FullName
+        $creationTime = $_.CreationTime
+        $processName = $_.Directory.Name.Split('_')[0]
+        $processID = $_.Directory.Name.Split('_')[1]
+        Get-TechJournalData $_.FullName | % {
+            $timeValue = $_.Groups['time'].Value
+            $errorTime = $creationTime.AddMinutes($timeValue.Substring(0,2)).AddSeconds($timeValue.Substring(3,2))
+            $duration = $timeValue.Split('-')[1]
+            $beginTime = $timeValue.Split('.')[1].Split('-')[0]
+            $newLine = 1 | Select-Object @{Label='time';           Expression={$errorTime}  }`
+                                        ,@{Label='begin';          Expression={$beginTime}  }`
+                                        ,@{Label='duration';       Expression={$duration}   }`
+                                        ,@{Label='fn:processName'; Expression={$processName}}`
+                                        ,@{Label='fn:processID';   Expression={$processID}  }
+            $names  = $_.Groups['name'] 
+            $values = $_.Groups['value']
+            1..$names.Captures.Count | % {
+                $propertyName = $names.Captures[$_-1].Value
+                $propertyValue = $values.Captures[$_-1].Value
+                if ( ($newLine | gm $propertyName) -eq $null ) 
+                {
+                    Add-Member -MemberType NoteProperty -Name $propertyName -Value $propertyValue -InputObject $newLine 
+                }
+                else
+                {
+                    $newValue = @()
+                    $newLine.$propertyName | % {$newValue += $_}
+                    $newValue += $propertyValue
+                    $newLine.$propertyName = $newValue
+                }
+            }
+            $table += $newLine
+        }
+    }
+
+    }
+
+    End
+    {
+    $table
+    }
+}
+
+<#
+.Synopsis
    Извлекает данные из xml-файла выгрузки APDEX
 .DESCRIPTION
    Производит извлечение данных из xml-файла выгрузки APDEX
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
 .EXAMPLE
    Get-APDEX-Data C:\APDEX\2017-05-16 07-02-54.xml
 .EXAMPLE
@@ -51,6 +140,15 @@ function Get-APDEXinfo
    Извлекает данные из файла лога технологического журнала
 .DESCRIPTION
    Производит извлечение данных из файла лога технологического журнала
+.NOTES  
+    Name: 1CHelper
+    Author: yauhen.makei@gmail.com
+.LINK  
+    https://github.com/mrDSide/1CHelper.psm1
+.INPUTS
+   Пусть к файлу(-ам) технологического журнала
+.OUTPUTS
+   Массив данных разбора текстовой информации журнала
 .EXAMPLE
    Get-TechJournalData C:\LOG\rphost_280\17061412.log
    $properties = $tree | % { $_.Groups['name'].Captures } | select -Unique
@@ -73,11 +171,6 @@ function Get-TechJournalData
 
     Begin {
         # Данный шаблон соответствует одной записи журнала
-        <# Не захватывает свойства вида "Context=Форма.ЗаблокироватьДанныеФормыДляРедактирования : Документ.СписаниеНДС.Форма.ФормаДокумента"
-        $template = @"
-^(?<line>(?<time>\d\d\:\d\d\.\d{6}\-\d)\,(?<type>\w+)\,(?<level>\d)(\,(?<name>(\w+\:)?\w+)\=(?<value>([\w\-]+|(\"[^"]+\")|(\'[^']+\'))?))+.*)
-"@
-#>
         $template = @"
 ^(?<line>(?<time>\d\d\:\d\d\.\d{6}\-\d)\,(?<type>\w+)\,(?<level>\d)(\,(?<name>(\w+\:)?\w+)\=(?<value>([^"'\,\n]+|(\"[^"]+\")|(\'[^']+\'))?))+.*)
 "@
@@ -2729,4 +2822,4 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData
+Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData, Get-APDEXinfo, Get-TechJournalLOGtable

@@ -1,5 +1,61 @@
 <#
 .Synopsis
+   Очистка временных каталогов 1С
+.DESCRIPTION
+   Удаляет временные каталоги 1С для пользователя(-ей) с возможностью отбора
+.NOTES      
+   Name: 1CHelper    
+   Author: yauhen.makei@gmail.com.LINK      
+   https://github.com/mrDSide/1CHelper.psm1
+.EXAMPLE
+   # Удаление всех временных каталогов информационных баз для текущего пользователя
+   Remove-1CTempDirs
+#>
+function Remove-1CTempDirs
+{
+   [CmdletBinding(SupportsShouldProcess = $true)]
+   Param    
+   (
+       # Имя пользователя для удаления каталогов(-а)
+       [Parameter(Mandatory=$false,
+                  ValueFromPipelineByPropertyName=$true,
+                  Position=0)]
+       [string[]]$User,
+       # Фильтр каталогов
+       [Parameter(Mandatory=$false,
+                  ValueFromPipelineByPropertyName=$true,
+                  Position=1)]
+       [string[]]$Filter        
+   )        
+   
+   if( -not $User )
+   {
+      $AppData = @($env:APPDATA, $env:LOCALAPPDATA)
+   }
+   else
+   {
+      Write-Host "Пока не поддерживается"
+      return
+   }
+   
+   $Dirs = $AppData | % { gci $_\1C\1cv8*\* -Directory } | Where-Object Name -Match "^\w{8}\-(\w{4}\-){3}\w{12}$"
+   if($Filter)
+   {
+      $Dirs = $Dirs | ? { $_.Name -in $Filter }
+   }
+   
+   if($WhatIfPreference)
+   {
+      $Dirs | % { "УДАЛЕНИЕ: $($_.FullName)" }
+   }
+   else
+   {
+      $Dirs | % { rm $_.FullName -Confirm:$ConfirmPreference -Verbose:$VerbosePreference -Recurse -Force }
+   }
+}
+
+<#
+.Synopsis
    Преобразует данные файла технологического журнала в таблицу
 .DESCRIPTION
    Производит извлечение данных из файла(-ов) технологического журнала и преобразует в таблицу
@@ -2822,4 +2878,4 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData, Get-APDEXinfo, Get-TechJournalLOGtable
+Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData, Get-APDEXinfo, Get-TechJournalLOGtable,Remove-1CTempDirs

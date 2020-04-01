@@ -1,4 +1,4 @@
-<#
+﻿<#
 .Synopsis
    Очистка временных каталогов 1С
 .DESCRIPTION
@@ -6,7 +6,7 @@
 .NOTES      
    Name: 1CHelper    
    Author: yauhen.makei@gmail.com.LINK      
-   https://github.com/mrDSide/1CHelper.psm1
+   https://github.com/emakei/1CHelper.psm1
 .EXAMPLE
    # Удаление всех временных каталогов информационных баз для текущего пользователя
    Remove-1CTempDirs
@@ -63,7 +63,7 @@ function Remove-1CTempDirs
     Name: 1CHelper
     Author: yauhen.makei@gmail.com
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 .INPUTS
    Пусть к файлу(-ам) технологического журнала
 .OUTPUTS
@@ -147,7 +147,7 @@ function Get-TechJournalLOGtable
     Name: 1CHelper
     Author: yauhen.makei@gmail.com
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 .EXAMPLE
    Get-APDEX-Data C:\APDEX\2017-05-16 07-02-54.xml
 .EXAMPLE
@@ -200,7 +200,7 @@ function Get-APDEXinfo
     Name: 1CHelper
     Author: yauhen.makei@gmail.com
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 .INPUTS
    Пусть к файлу(-ам) технологического журнала
 .OUTPUTS
@@ -274,7 +274,7 @@ function Remove-NotUsedObjects
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .INPUTS
    Пусть к файлам выгрузки конфигурации
@@ -684,7 +684,7 @@ function Find-1CEstart
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
    Find-1CEstart
@@ -783,7 +783,7 @@ function Find-1C8conn
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
    Find-1C8conn
@@ -822,7 +822,7 @@ function Get-ClusterData
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
     Get-1CclusterData
@@ -1756,7 +1756,7 @@ function Remove-Session
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
     $data = Get-1CclusterData 1c-cluster.contoso.com -NoClusterAdmins -NoClusterManagers -NoWorkingServers -NoWorkingProcesses -NoClusterServices -ShowConnections None -ShowSessions Cluster -ShowLocks None -NoInfobases -NoAssignmentRules -User Example -Password Example
@@ -1894,7 +1894,7 @@ function Get-NetHaspIniStrings
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
    Get-NetHaspIniStrings
@@ -1934,7 +1934,7 @@ function Find-1CApplicationForExportImport
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
    Find-1CApplicationForExportImport
@@ -2024,7 +2024,7 @@ function Get-NetHaspDirectoryPath
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
    Get-NetHaspDirectoryPath
@@ -2048,7 +2048,7 @@ function Get-NetHaspIniFilePath
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
    Get-NetHaspIniFilePath
@@ -2073,7 +2073,7 @@ function Invoke-SqlQuery
     Author: yauhen.makei@gmail.com
 
 .LINK  
-    https://github.com/mrDSide/1CHelper.psm1
+    https://github.com/emakei/1CHelper.psm1
 
 
 .EXAMPLE

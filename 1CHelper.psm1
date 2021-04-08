@@ -38,19 +38,19 @@ function Remove-1CTempDirs
       return
    }
    
-   $Dirs = $AppData | % { gci $_\1C\1cv8*\* -Directory } | Where-Object Name -Match "^\w{8}\-(\w{4}\-){3}\w{12}$"
+   $Dirs = $AppData | ForEach-Object { Get-ChildItem $_\1C\1cv8*\* -Directory } | Where-Object Name -Match "^\w{8}\-(\w{4}\-){3}\w{12}$"
    if($Filter)
    {
-      $Dirs = $Dirs | ? { $_.Name -in $Filter }
+      $Dirs = $Dirs | Where-Object { $_.Name -in $Filter }
    }
    
    if($WhatIfPreference)
    {
-      $Dirs | % { "УДАЛЕНИЕ: $($_.FullName)" }
+      $Dirs | ForEach-Object { "УДАЛЕНИЕ: $($_.FullName)" }
    }
    else
    {
-      $Dirs | % { rm $_.FullName -Confirm:$ConfirmPreference -Verbose:$VerbosePreference -Recurse -Force }
+      $Dirs | ForEach-Object { Remove-Item $_.FullName -Confirm:$ConfirmPreference -Verbose:$VerbosePreference -Recurse -Force }
    }
 }
 
@@ -94,12 +94,12 @@ function Get-TechJournalLOGtable
     Process
     {
 
-    Get-ChildItem $fileName -Recurse -File | % {
+    Get-ChildItem $fileName -Recurse -File | ForEach-Object {
         Write-Verbose $_.FullName
         $creationTime = $_.CreationTime
         $processName = $_.Directory.Name.Split('_')[0]
         $processID = $_.Directory.Name.Split('_')[1]
-        Get-TechJournalData $_.FullName | % {
+        Get-TechJournalData $_.FullName | ForEach-Object {
             $timeValue = $_.Groups['time'].Value
             $errorTime = $creationTime.AddMinutes($timeValue.Substring(0,2)).AddSeconds($timeValue.Substring(3,2))
             $duration = $timeValue.Split('-')[1]
@@ -111,17 +111,17 @@ function Get-TechJournalLOGtable
                                         ,@{Label='fn:processID';   Expression={$processID}  }
             $names  = $_.Groups['name'] 
             $values = $_.Groups['value']
-            1..$names.Captures.Count | % {
+            1..$names.Captures.Count | ForEach-Object {
                 $propertyName = $names.Captures[$_-1].Value
                 $propertyValue = $values.Captures[$_-1].Value
-                if ( ($newLine | gm $propertyName) -eq $null ) 
+                if ( $null -eq ($newLine | Get-Member $propertyName) ) 
                 {
                     Add-Member -MemberType NoteProperty -Name $propertyName -Value $propertyValue -InputObject $newLine 
                 }
                 else
                 {
                     $newValue = @()
-                    $newLine.$propertyName | % {$newValue += $_}
+                    $newLine.$propertyName | ForEach-Object {$newValue += $_}
                     $newValue += $propertyValue
                     $newLine.$propertyName = $newValue
                 }
@@ -172,7 +172,7 @@ function Get-APDEXinfo
     }
 
     Process {
-        Get-ChildItem $fileName -Recurse -File | % {
+        Get-ChildItem $fileName -Recurse -File | ForEach-Object {
             Write-Verbose $_.FullName
             try {
                 $xdoc.Load($_.FullName)
@@ -180,7 +180,7 @@ function Get-APDEXinfo
                     $tree += $xdoc.Performance.KeyOperation
                 }
             } catch {
-                $Error | % { Write-Error $_ }
+                $Error | ForEach-Object { Write-Error $_ }
             }
         }
     }
@@ -235,12 +235,12 @@ function Get-TechJournalData
     }
 
     Process {
-        Get-ChildItem $fileName -Recurse -File | % {
+        Get-ChildItem $fileName -Recurse -File | ForEach-Object {
             Write-Verbose $_.FullName
             $rawText = Get-Content $_.FullName -Encoding UTF8 -Raw
             if ($rawText) {
-                $matches = $regex.Matches($rawText)
-                $tree += $matches
+                $textMatches = $regex.Matches($rawText)
+                $tree += $textMatches
             }
         }
     }
@@ -310,7 +310,7 @@ function Remove-NotUsedObjects
         Write-Verbose "Начало обработки файлов в $(Get-Date)"
         # Переменная для поиска подстроки определения типа платформы в строке с типом метаданных
         $chars = [char[]]("A")
-        66..90 | % { $chars += [char]$_ }
+        66..90 | ForEach-Object { $chars += [char]$_ }
         # Содержит псевдонимы пространств имен для XPath
         $hashTable = @{ root = "http://v8.1c.ru/8.3/MDClasses"; core = "http://v8.1c.ru/8.1/data/core"; readable = "http://v8.1c.ru/8.3/xcf/readable" }
         # Используется для приведения строки в нижний регистр при поиске подстроки "(не используется)"
@@ -332,7 +332,7 @@ function Remove-NotUsedObjects
             $childRefs = [string[]]("")
             # Выборка файлов вида <ИмяТипаПлатформы>.<ИмяТипаМетаданных>.xml
             Write-Progress -Activity "Поиск файлов *.xml" -Completed 
-            $files = ls -LiteralPath $pathToFiles -Filter *.xml -File #| ? { $_.Name.ToString().Split('.').Count -eq 3 }
+            $files = Get-ChildItem -LiteralPath $pathToFiles -Filter *.xml -File #| ? { $_.Name.ToString().Split('.').Count -eq 3 }
             $i = 1
             foreach ($item in $files) {
                 Write-Progress -Activity "Поиск не используемых элементов в файлах *.xml" -PercentComplete ( $i / $files.Count * 100 )
@@ -356,14 +356,14 @@ function Remove-NotUsedObjects
                 if ($thisIsShort -and ($xml | `
                     Select-Xml -XPath ("//root:$pref/root:Properties/root:Synonym/core:item/core:content[contains(translate(text(),$($dict.replace),$($dict.with)),'(не используется)')]") `
                         -Namespace $hashTable `
-                        | measure).Count -gt 0) {
+                        | Measure-Object).Count -gt 0) {
                     # Добавляем имя файла в массив удаляемых
                     $fileRefs += $item.FullName
                     # Находим производные типы
                     $tmp = $xml | Select-Xml -XPath ("//root:$pref/root:InternalInfo/readable:GeneratedType/@name") -Namespace $hashTable
-                    $tmp | % { $typeRefs += $_.ToString() }
+                    $tmp | ForEach-Object { $typeRefs += $_.ToString() }
                     # Находим подчиненные объекты (<ИмяТипаПлатформы>.<ИмяТипаМетаданных>.*) и добавляем к удаляемым файлам
-                    ls -LiteralPath $pathToFiles -Filter "$($m[0]).$($m[1]).*" -File | ? { $_.Name.ToString().Split('.').Count -gt 3 } | % { $fileRefs += $_.FullName }
+                    Get-ChildItem -LiteralPath $pathToFiles -Filter "$($m[0]).$($m[1]).*" -File | Where-Object { $_.Name.ToString().Split('.').Count -gt 3 } | ForEach-Object { $fileRefs += $_.FullName }
                     $addAll = $true
                 } elseif(-not $thisIsShort) {
                     
@@ -371,16 +371,16 @@ function Remove-NotUsedObjects
                 # Поиск аттрибутов
                 if ($addAll) {
                     # Поиск аттрибутов
-                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Attribute/root:Properties/root:Name", $nsmgr) | % { $childRefs += "$pref.$name.Attribute.$($_.'#text')" } 
+                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Attribute/root:Properties/root:Name", $nsmgr) | ForEach-Object { $childRefs += "$pref.$name.Attribute.$($_.'#text')" } 
                     # Поиск форм
-                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Form", $nsmgr) | % { $childRefs += "$pref.$name.Form.$($_.'#text')" }
+                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Form", $nsmgr) | ForEach-Object { $childRefs += "$pref.$name.Form.$($_.'#text')" }
                     # Поиск команд
-                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Command/root:Properties/root:Name", $nsmgr) | % { $childRefs += "$pref.$name.Command.$($_.'#text')" }
+                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Command/root:Properties/root:Name", $nsmgr) | ForEach-Object { $childRefs += "$pref.$name.Command.$($_.'#text')" }
                     # Поиск макетов
-                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Template", $nsmgr) | % { "$pref.$name.Template.$($_.'#text')" }
+                    $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Template", $nsmgr) | ForEach-Object { "$pref.$name.Template.$($_.'#text')" }
                     # Поиск ресурсов информациооного регистра
                     if ($pref -eq 'InformationRegister') {
-                        $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Resource/root:Properties/root:Name", $nsmgr) | % { "$pref.$name.Resource.$($_.'#text')" }
+                        $xml.SelectNodes("//root:MetaDataObject/root:$pref/root:ChildObjects/root:Resource/root:Properties/root:Name", $nsmgr) | ForEach-Object { "$pref.$name.Resource.$($_.'#text')" }
                     }
                 } else {
                     <# 
@@ -397,14 +397,14 @@ function Remove-NotUsedObjects
                 $i++
             }
             # Удаляем файлы
-            $fileRefs | ? { $_ -notlike '' } | % {rm $_ -Verbose}
+            $fileRefs | Where-Object { $_ -notlike '' } | ForEach-Object {Remove-Item $_ -Verbose}
             # Выбираем оставшиеся для поиска неиспользуемых ссылок на типы и атрибутов
             Write-Progress -Activity "Поиск файлов *.xml" -Completed -Status "Подготовка"
-            $filesToUpdate = ls -LiteralPath $pathToFiles -Filter *.xml -File
+            $filesToUpdate = Get-ChildItem -LiteralPath $pathToFiles -Filter *.xml -File
             # Удаляем пустой элемент (Создан при вызове конструктора типа)
             Write-Progress -Activity "Обработка ссылок для поиска" -Completed -Status "Подготовка"
-            $typeRefs = $typeRefs | ? { $_ -notlike '' } | select -Unique
-            $childRefs = $childRefs | ? { $_ -notlike '' } | select -Unique
+            $typeRefs = $typeRefs | Where-Object { $_ -notlike '' } | Select-Object -Unique
+            $childRefs = $childRefs | Where-Object { $_ -notlike '' } | Select-Object -Unique
             $i = 1
             foreach ( $item in $filesToUpdate ) {
                 Write-Progress -Activity "Обработка файлов *.xml" -PercentComplete ( $i / $filesToUpdate.Count * 100 )
@@ -440,7 +440,7 @@ function Remove-NotUsedObjects
                         }
                         $tpref = $tref.ToString().Split('.')[0] 
                         $max = -1
-                        $chars | % { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
+                        $chars | ForEach-Object { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
                         if ($max -eq -1) {
                             Write-Error "Неверный тип для поиска" -ErrorId C2 -Targetobject $tref -Category ParserError
                             continue
@@ -448,7 +448,7 @@ function Remove-NotUsedObjects
                             $type = if($max -eq 0) { $tref.Split('.')[0] } else { $tpref.Substring(0, $max) }
                             try {
                                 $xml.SelectNodes("//root:MetaDataObject/root:Configuration/root:ChildObjects/root:$type[text()='$($tref.Split('.')[1])']/.", $nsmgr) `
-                                    | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                                    | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                             } catch {
                                 Write-Error "Ошибка обработки файла" -ErrorId C3 `
                                     -Targetobject "//root:MetaDataObject/root:Configuration/root:ChildObjects/root:$type[text()='$($tref.Split('.')[1])']/."
@@ -470,7 +470,7 @@ function Remove-NotUsedObjects
                         }
                         $tpref = $tref.ToString().Split('.')[0] 
                         $max = -1
-                        $chars | % { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
+                        $chars | ForEach-Object { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
                         if ($max -eq -1) {
                             Write-Error "Неверный тип для поиска" -ErrorId C2 -Targetobject $tref -Category ParserError
                             continue
@@ -479,7 +479,7 @@ function Remove-NotUsedObjects
                             if ($tref.StartsWith('Role.')) {
                                 try {
                                     $xml.SelectNodes("//exch:$name/exch:SubsystemsVisibility/exch:Subsystem/exch:Visibility/item:Value[@name='$tref']/.", $nsmgr) `
-                                        | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                                        | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                                 } catch {
                                     Write-Error "Ошибка обработки файла" -ErrorId C3 `
                                         -Targetobject "//exch:$name/exch:SubsystemsVisibility/exch:Subsystem/exch:Visibility/item:Value[@name='$tref']/."
@@ -488,7 +488,7 @@ function Remove-NotUsedObjects
                             } else {
                                 try {
                                     $xml.SelectNodes("//exch:$name/exch:SubsystemsVisibility/exch:Subsystem[@name='$tref']/.", $nsmgr) `
-                                        | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                                        | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                                 } catch {
                                     Write-Error "Ошибка обработки файла" -ErrorId C3 `
                                         -Targetobject "//exch:$name/exch:SubsystemsVisibility/exch:Subsystem[@name='$tref']/."
@@ -496,7 +496,7 @@ function Remove-NotUsedObjects
                                 }
                                 try {
                                     $xml.SelectNodes("//exch:$name/exch:SubsystemsOrder/exch:Subsystem[text()='$tref']/.", $nsmgr) `
-                                        | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                                        | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                                 } catch {
                                     Write-Error "Ошибка обработки файла" -ErrorId C3 `
                                         -Targetobject "//exch:$name/exch:SubsystemsOrder/exch:Subsystem[text()='$tref']/."
@@ -566,7 +566,7 @@ function Remove-NotUsedObjects
                         }
                         $tpref = $tref.ToString().Split('.')[0]
                         $max = -1
-                        $chars | % { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
+                        $chars | ForEach-Object { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
                         if ($max -eq -1) {
                             Write-Error "Неверный тип для поиска" -ErrorId S2 -Targetobject $tref -Category ParserError
                             continue
@@ -574,7 +574,7 @@ function Remove-NotUsedObjects
                             $type = if($max -eq 0) { $tref.Split('.')[0] } else { $tpref.Substring(0, $max) }
                             try {
                                 $xml.SelectNodes("//root:MetaDataObject/root:Subsystem/root:Properties/root:Content/item:Item[text()='$($type+'.'+$tref.Split('.')[1])']/.", $nsmgr) `
-                                    | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                                    | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                             } catch {
                                 Write-Error "Ошибка обработки файла" -ErrorId S3 `
                                     -Targetobject "//root:MetaDataObject/root:Subsystem/root:Properties/root:Content/item:Item[text()='$($type+'.'+$tref.Split('.')[1])']/."
@@ -594,7 +594,7 @@ function Remove-NotUsedObjects
                         }
                         $tpref = $tref.ToString().Split('.')[0]
                         $max = -1
-                        $chars | % { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
+                        $chars | ForEach-Object { $max = [Math]::Max($max, $tpref.LastIndexOf($_)) }
                         if ($max -eq -1) {
                             Write-Error "Неверный тип для поиска" -ErrorId S2 -Targetobject $tref -Category ParserError
                             continue
@@ -602,7 +602,7 @@ function Remove-NotUsedObjects
                             $type = if($max -eq 0) { $tref.Split('.')[0] } else { $tpref.Substring(0, $max) }
                             try {
                                 $xml.SelectNodes("//exch:$name/exch:Item/exch:Metadata/[text()='$($type+'.'+$tref.Split('.')[1])']/.", $nsmgr) `
-                                    | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                                    | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                             } catch {
                                 Write-Error "Ошибка обработки файла" -ErrorId S3 `
                                     -Targetobject "//exch:$name/exch:Item/exch:Metadata/[text()='$($type+'.'+$tref.Split('.')[1])']/."
@@ -617,10 +617,10 @@ function Remove-NotUsedObjects
                 # Иначе удаляем ссылки на неиспользуемые типы и узлы с синонимом содержащим текст "(не используется)" 
                 else {
                     Write-Verbose "Поиск ссылок" 
-                    $typeRefs | % { $xml.SelectNodes("//*/core:Type[contains(text(), '$_')]/.", $nsmgr) } | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                    $typeRefs | ForEach-Object { $xml.SelectNodes("//*/core:Type[contains(text(), '$_')]/.", $nsmgr) } | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                     Write-Verbose "Поиск неиспользуемых атрибутов"
                     $xml.SelectNodes("//*/core:content[contains(translate(text(),$($dict.replace),$($dict.with)),'(не используется)')]/../../../..", $nsmgr) `
-                        | % { $_.ParentNode.RemoveChild($_) | Out-Null }
+                        | ForEach-Object { $_.ParentNode.RemoveChild($_) | Out-Null }
                 }
                 if (Test-Path -LiteralPath $item.FullName) {
                     $xml.Save($item.FullName)
@@ -629,7 +629,7 @@ function Remove-NotUsedObjects
             }
             # Обработка модулей объектов
             Write-Progress -Activity "Поиск файлов модулей (*.txt)" -Completed
-            $txtFiles = ls -LiteralPath $pathToFiles -Filter *.txt -File
+            $txtFiles = Get-ChildrenItem -LiteralPath $pathToFiles -Filter *.txt -File
             $i = 1
             foreach ( $item in $txtFiles ) {
                 Write-Progress -Activity "Обработка файлов *.txt" -PercentComplete ( $i / $txtFiles.Count * 100 )
@@ -795,7 +795,7 @@ function Find-1C8conn
     [OutputType([Object[]])]
     Param(
         # Использовать общие файлы
-        [switch]$UseCommonFiles = $true,
+        [switch]$UseCommonFiles = $False,
         [string[]]$UseFilesFromDirectories
     )
 
@@ -1787,7 +1787,7 @@ Param(
         # Имя админитратора информационной базы
         [string]$IbUser="",
         # Пароль администратора информационной базы
-        [string]$IbPassword="",
+        [securestring]$IbPassword="",
         # Версия компоненты
         [ValidateSet(2, 3, 4)]
         [int]$Version=3
@@ -1850,7 +1850,9 @@ Process {
                         $server = $connector.ConnectWorkingProcess( "$($session.Process.HostName):$($session.Process.MainPort)" )
                         # проходим аутентификацию в информационной базе
                         Write-Verbose "Аутентификация пользователя инф. базы '$($IbUser)' в информационной базе '$($InfoBaseName)'"
-                        $server.AddAuthentication( $IbUser, $IbPassword )
+                        $BSTRIbPassword = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($IbPassword)
+                        $PlainIbPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTRIbPassword)
+                        $server.AddAuthentication( $IbUser, $PlainIbPassword )
                         # отключаем соединение
                         $ibDesc = $server.CreateInfoBaseInfo()
                         $ibDesc.Name = $InfoBaseName
@@ -1912,8 +1914,8 @@ function Get-NetHaspIniStrings
     if ( $pathToStarter ) {
         
         $content = Get-Content -Encoding UTF8 -LiteralPath $pathToFile
-        $strings = $content | ? { $_ -match "^\w" }
-        $strings | % { $keyValue = $_.Split('='); $key = $keyValue[0].Replace(" ",""); $value = $keyValue[1].Replace(" ",""); $value = $value.Replace(';',''); $struct[$key] = $value.Split(',') }
+        $strings = $content | Where-Object { $_ -match "^\w" }
+        $strings | ForEach-Object { $keyValue = $_.Split('='); $key = $keyValue[0].Replace(" ",""); $value = $keyValue[1].Replace(" ",""); $value = $value.Replace(';',''); $struct[$key] = $value.Split(',') }
 
     }
 
@@ -2661,7 +2663,7 @@ function Invoke-NetHasp
        $Logins = ForEach ($Slot In $Slots) { 
           Get-NetHASPData -Command "GET LOGINS,ID=$($Slot.ID),MA=$($Slot.MA),SLOT=$($Slot.SLOT)" -SkipScanning;
        }
-       $Objects = $Logins = PropertyEqualOrAny -InputObject $Slots -Property INDEX -Value $LoginId
+       $Objects = $Logins | PropertyEqualOrAny -InputObject $Slots -Property INDEX -Value $LoginId
     }
 
 

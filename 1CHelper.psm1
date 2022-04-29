@@ -251,7 +251,6 @@ function Get-TechJournalData
    
 }
 
-function Remove-NotUsedObjects
 <#
 .Synopsis
    Удаление неиспользуемых объектов конфигурации
@@ -283,6 +282,7 @@ function Remove-NotUsedObjects
    Массив объектов с описанием файлов модулей и позиций, содержащих упоминания удаляемых объектов
 
 #>
+function Remove-NotUsedObjects
 {
     [CmdletBinding(DefaultParameterSetName='pathToConfigurationFiles', 
                   SupportsShouldProcess=$true, 
@@ -629,7 +629,7 @@ function Remove-NotUsedObjects
             }
             # Обработка модулей объектов
             Write-Progress -Activity "Поиск файлов модулей (*.txt)" -Completed
-            $txtFiles = Get-ChildrenItem -LiteralPath $pathToConfigurationFiles -Filter *.txt -File
+            $txtFiles = Get-ChildItem -LiteralPath $pathToConfigurationFiles -Filter *.txt -File
             $i = 1
             foreach ( $item in $txtFiles ) {
                 Write-Progress -Activity "Обработка файлов *.txt" -PercentComplete ( $i / $txtFiles.Count * 100 )

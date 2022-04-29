@@ -14,7 +14,7 @@
 function Remove-1CTempDirs
 {
    [CmdletBinding(SupportsShouldProcess = $true)]
-   Param    
+   Param
    (
        # Имя пользователя для удаления каталогов(-а)
        [Parameter(Mandatory=$false,
@@ -25,8 +25,8 @@ function Remove-1CTempDirs
        [Parameter(Mandatory=$false,
                   ValueFromPipelineByPropertyName=$true,
                   Position=1)]
-       [string[]]$Filter        
-   )        
+       [string[]]$Filter
+   )
    
    if( -not $User )
    {
@@ -2436,9 +2436,9 @@ function Invoke-NetHasp
 
 .PARAMETER Action
     What need to do with collection or its item:
-        Discovery - Make Zabbix's LLD JSON;
-        Get       - Get metric from collection's item;
-        Count     - Count collection's items.
+        Discovery - Make Zabbix`'s LLD JSON;
+        Get       - Get metric from collection`'s item;
+        Count     - Count collection`'s items.
         DoCommand - Do NetHASP Monitor command that not require connection to server (HELP, VERSION). Command must be specified with -Key parameter
 
 .PARAMETER ObjectType
@@ -2449,7 +2449,7 @@ function Invoke-NetHasp
         Login - authorized connects to NetHASP server ("GET LOGINS ...").
 
 .PARAMETER Key
-    Define "path" to collection item's metric 
+    Define "path" to collection item`'s metric 
 
 .PARAMETER ServerID
     Used to select NetHASP server from list. 
@@ -2486,7 +2486,7 @@ function Invoke-NetHasp
 
     Description
     -----------  
-    Make Zabbix's LLD JSON for NetHASP servers
+    Make Zabbix`'s LLD JSON for NetHASP servers
 
 .EXAMPLE 
     ... -Action "Get" -ObjectType "Slot" -Key "CURR" -ServerId "stuffserver.contoso.com" -SlotId "16" -ErrorCode "-127"
@@ -2751,7 +2751,7 @@ function Invoke-UsbHasp
 
 .PARAMETER Action
     What need to do with collection or its item:
-        Discovery - Make Zabbix's LLD JSON;
+        Discovery - Make Zabbix`'s LLD JSON;
         Get       - Get metric from collection item;
         Count     - Count collection items.
 
@@ -2761,7 +2761,7 @@ function Invoke-UsbHasp
         LogicalDevice - "Logical" devices (HASP Key)
 
 .PARAMETER Key
-    Define "path" to collection item's metric 
+    Define "path" to collection item`'s metric 
 
 .PARAMETER PnPDeviceID
     Used to select only one item from collection
@@ -2777,7 +2777,7 @@ function Invoke-UsbHasp
 
     Description
     -----------  
-    Make Zabbix's LLD JSON for USB keys
+    Make Zabbix`'s LLD JSON for USB keys
 
 .EXAMPLE 
     ... -Action "Count" -ObjectType "LogicalDevice"

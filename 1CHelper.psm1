@@ -332,7 +332,7 @@ function Remove-NotUsedObjects
             $childRefs = [string[]]("")
             # Выборка файлов вида <ИмяТипаПлатформы>.<ИмяТипаМетаданных>.xml
             Write-Progress -Activity "Поиск файлов *.xml" -Completed 
-            $files = Get-ChildItem -LiteralPath $pathToFiles -Filter *.xml -File #| ? { $_.Name.ToString().Split('.').Count -eq 3 }
+            $files = Get-ChildItem -LiteralPath $pathToConfigurationFiles -Filter *.xml -File #| ? { $_.Name.ToString().Split('.').Count -eq 3 }
             $i = 1
             foreach ($item in $files) {
                 Write-Progress -Activity "Поиск не используемых элементов в файлах *.xml" -PercentComplete ( $i / $files.Count * 100 )
@@ -400,7 +400,7 @@ function Remove-NotUsedObjects
             $fileRefs | Where-Object { $_ -notlike '' } | ForEach-Object {Remove-Item $_ -Verbose}
             # Выбираем оставшиеся для поиска неиспользуемых ссылок на типы и атрибутов
             Write-Progress -Activity "Поиск файлов *.xml" -Completed -Status "Подготовка"
-            $filesToUpdate = Get-ChildItem -LiteralPath $pathToFiles -Filter *.xml -File
+            $filesToUpdate = Get-ChildItem -LiteralPath $pathToConfigurationFiles -Filter *.xml -File
             # Удаляем пустой элемент (Создан при вызове конструктора типа)
             Write-Progress -Activity "Обработка ссылок для поиска" -Completed -Status "Подготовка"
             $typeRefs = $typeRefs | Where-Object { $_ -notlike '' } | Select-Object -Unique
@@ -629,7 +629,7 @@ function Remove-NotUsedObjects
             }
             # Обработка модулей объектов
             Write-Progress -Activity "Поиск файлов модулей (*.txt)" -Completed
-            $txtFiles = Get-ChildrenItem -LiteralPath $pathToFiles -Filter *.txt -File
+            $txtFiles = Get-ChildrenItem -LiteralPath $pathToConfigurationFiles -Filter *.txt -File
             $i = 1
             foreach ( $item in $txtFiles ) {
                 Write-Progress -Activity "Обработка файлов *.txt" -PercentComplete ( $i / $txtFiles.Count * 100 )

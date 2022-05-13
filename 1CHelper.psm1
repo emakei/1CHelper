@@ -3,9 +3,9 @@
    Очистка временных каталогов 1С
 .DESCRIPTION
    Удаляет временные каталоги 1С для пользователя(-ей) с возможностью отбора
-.NOTES      
-   Name: 1CHelper    
-   Author: yauhen.makei@gmail.com.LINK      
+.NOTES
+   Name: 1CHelper
+   Author: yauhen.makei@gmail.com
    https://github.com/emakei/1CHelper.psm1
 .EXAMPLE
    # Удаление всех временных каталогов информационных баз для текущего пользователя
@@ -55,7 +55,7 @@ function Remove-1CTempDirs
 }
 
 <#
-.Synopsis
+.SYNOPSIS
    Преобразует данные файла технологического журнала в таблицу
 .DESCRIPTION
    Производит извлечение данных из файла(-ов) технологического журнала и преобразует в таблицу
@@ -192,7 +192,7 @@ function Get-APDEXinfo
 }
 
 <#
-.Synopsis
+.SYNOPSIS
    Извлекает данные из файла лога технологического журнала
 .DESCRIPTION
    Производит извлечение данных из файла лога технологического журнала
@@ -252,7 +252,7 @@ function Get-TechJournalData
 }
 
 <#
-.Synopsis
+.SYNOPSIS
    Удаление неиспользуемых объектов конфигурации
 
 .DESCRIPTION
@@ -673,7 +673,7 @@ function Remove-NotUsedObjects
 
 function Find-1CEstart
 <#
-.Synopsis
+.SYNOPSIS
    Поиск стартера 1С
 
 .DESCRIPTION
@@ -772,7 +772,7 @@ function Find-1CEstart
 
 function Find-1C8conn
 <#
-.Synopsis
+.SYNOPSIS
    Поиск строк подключения 1С
 
 .DESCRIPTION
@@ -812,7 +812,7 @@ function Find-1C8conn
 
 function Get-ClusterData
 <#
-.Synopsis
+.SYNOPSIS
     Собирает информацию с кластеров 1С
 
 .DESCRIPTION
@@ -1746,7 +1746,7 @@ End {
 
 function Remove-Session
 <#
-.Synopsis
+.SYNOPSIS
     Удаляет сеанс с кластера 1с
 
 .DESCRIPTION
@@ -1886,7 +1886,7 @@ End {
 
 function Get-NetHaspIniStrings
 <#
-.Synopsis
+.SYNOPSIS
    Находит значения параметров в файле nethasp.ini
 
 .DESCRIPTION
@@ -1925,7 +1925,7 @@ function Get-NetHaspIniStrings
 
 function Find-1CApplicationForExportImport
 <#
-.Synopsis
+.SYNOPSIS
    Поиск максимальной версии приложения
 
 .DESCRIPTION
@@ -2016,7 +2016,7 @@ function Find-1CApplicationForExportImport
 
 function Get-NetHaspDirectoryPath
 <#
-.Synopsis
+.SYNOPSIS
    Возвращает путь к каталогу с библиотекой hsmon.dll
 
 .DESCRIPTION
@@ -2040,7 +2040,7 @@ function Get-NetHaspDirectoryPath
 
 function Get-NetHaspIniFilePath
 <#
-.Synopsis
+.SYNOPSIS
    Возвращает путь к файлу nethasp.ini
 
 .DESCRIPTION
@@ -2065,7 +2065,7 @@ function Get-NetHaspIniFilePath
 
 function Invoke-SqlQuery
 <#
-.Synopsis
+.SYNOPSIS
    Возвращает результат выполнения запроса к серверу SQL
 
 .DESCRIPTION

@@ -671,7 +671,6 @@ function Remove-NotUsedObjects
     }
 }
 
-function Find-1CEstart
 <#
 .SYNOPSIS
    Поиск стартера 1С
@@ -692,6 +691,8 @@ function Find-1CEstart
 .OUTPUTS
    NULL или строку с полным путём к исполняемому файлу
 #>
+
+function Find-1CEstart
 {
     Param(
         # Имя компьютера для поиска версии
@@ -770,7 +771,6 @@ function Find-1CEstart
     $pathToStarter
 }
 
-function Find-1C8conn
 <#
 .SYNOPSIS
    Поиск строк подключения 1С
@@ -791,6 +791,7 @@ function Find-1C8conn
 .OUTPUTS
    массив найденных строк поключения 1С
 #>
+function Find-1C8conn
 {
     [OutputType([Object[]])]
     Param(
@@ -810,7 +811,6 @@ function Find-1C8conn
     
 }
 
-function Get-ClusterData
 <#
 .SYNOPSIS
     Собирает информацию с кластеров 1С
@@ -840,6 +840,7 @@ function Get-ClusterData
 .OUTPUTS
     Данные кластера
 #>
+function Get-ClusterData
 {
 [OutputType([Object[]])]
 [CmdletBinding()]
@@ -1744,7 +1745,6 @@ End {
 
 }
 
-function Remove-Session
 <#
 .SYNOPSIS
     Удаляет сеанс с кластера 1с
@@ -1763,6 +1763,7 @@ function Remove-Session
     Remove-1Csession -HostName $data.Clusters.HostName -MainPort $data.Clusters.MainPort -User Admin -Password Admin -SessionID 3076 -InfoBaseName TestDB -Verbose -NotCloseConnection
 
 #>
+function Remove-Session
 {
 [CmdletBinding()]
 Param(
@@ -1884,7 +1885,6 @@ End {
 
 }
 
-function Get-NetHaspIniStrings
 <#
 .SYNOPSIS
    Находит значения параметров в файле nethasp.ini
@@ -1904,6 +1904,7 @@ function Get-NetHaspIniStrings
 .OUTPUTS
    Структура параметров
 #>
+function Get-NetHaspIniStrings
 {
     
     $struct = @{}
@@ -1923,7 +1924,6 @@ function Get-NetHaspIniStrings
 
 }
 
-function Find-1CApplicationForExportImport
 <#
 .SYNOPSIS
    Поиск максимальной версии приложения
@@ -1944,6 +1944,7 @@ function Find-1CApplicationForExportImport
 .OUTPUTS
    NULL или строку с путем установки приложения
 #>
+function Find-1CApplicationForExportImport
 {
     Param(
         # Имя компьютера для поиска версии
@@ -2014,7 +2015,6 @@ function Find-1CApplicationForExportImport
      $installationPath
 }
 
-function Get-NetHaspDirectoryPath
 <#
 .SYNOPSIS
    Возвращает путь к каталогу с библиотекой hsmon.dll
@@ -2034,11 +2034,11 @@ function Get-NetHaspDirectoryPath
 .OUTPUTS
    Путь к каталогу с библиотекой hsmon.dll
 #>
+function Get-NetHaspDirectoryPath
 {  
     (Get-Module 1CHelper).Path.TrimEnd('1CHelper.psm1') + "hasp"
 }
 
-function Get-NetHaspIniFilePath
 <#
 .SYNOPSIS
    Возвращает путь к файлу nethasp.ini
@@ -2058,12 +2058,12 @@ function Get-NetHaspIniFilePath
 .OUTPUTS
    Путь к к файлу nethasp.ini
 #>
+function Get-NetHaspIniFilePath
 {  
     $pathToStarter = Find-1CEstart
     $pathToStarter.Replace("common\1cestart.exe", "conf\nethasp.ini")
 }
 
-function Invoke-SqlQuery
 <#
 .SYNOPSIS
    Возвращает результат выполнения запроса к серверу SQL
@@ -2088,6 +2088,7 @@ function Invoke-SqlQuery
     Invoke-SqlQuery -Server test.contoso.com -user admin -password admin -Data CurrentExequtingQueries -Verbose
 
 #>
+function Invoke-SqlQuery
 {
 Param(
     [string]$Server='local',
@@ -2414,7 +2415,6 @@ Function Get-NetHASPData {
    }
 }
 
-function Invoke-NetHasp
 <#
 .SYNOPSIS  
     Return Sentinel/Aladdin HASP Network Monitor metrics value, make LLD-JSON for Zabbix
@@ -2502,6 +2502,7 @@ function Invoke-NetHasp
     -----------  
     Show formatted list of 'Module' object(s) metrics. Verbose messages is enabled. Console width is not changed.
 #>
+function Invoke-NetHasp
 {
     Param (
        [Parameter(Mandatory = $True)] 
@@ -2731,7 +2732,6 @@ function Invoke-NetHasp
     $Result;
 }
 
-function Invoke-UsbHasp
 <#
 .SYNOPSIS  
     Return USB (HASP) Device metrics value, count selected objects, make LLD-JSON for Zabbix
@@ -2796,6 +2796,7 @@ function Invoke-UsbHasp
 
     Note that PNPDeviceID is unique for USB Key, ID - is not.
 #>
+function Invoke-UsbHasp
 {
     Param (
        [Parameter(Mandatory = $True)] 

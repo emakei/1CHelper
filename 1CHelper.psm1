@@ -2881,4 +2881,4 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData, Get-APDEXinfo, Get-TechJournalLOGtable,Remove-1CTempDirs
+Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData, Get-APDEXinfo, Get-TechJournalLOGtable, Remove-1CTempDirs

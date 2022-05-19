@@ -786,26 +786,71 @@ function Find-1CEstart
     https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
-   Find-1C8conn
+    Find-1C8conn -UseCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\") | select Line
+
+.EXAMPLE
+    Find-1C8conn -UseCommonFiles
+
+.EXAMPLE
+    Find-1C8conn -UseCommonFiles -ReturnValue Files
+
+.EXAMPLE
+    Find-1C8conn -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\")
+
+.EXAMPLE
+    Find-1C8conn -UseCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\")
+
+.EXAMPLE
+    Find-1C8conn -UseCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\") -ReturnValue Files
 
 .OUTPUTS
-   массив найденных строк поключения 1С
+    Список совпадений по шаблону строки подключения в файлах
+
+.OUTPUTS
+    Список найденных файлов *.v8i
+
 #>
 function Find-1C8conn
 {
     [OutputType([Object[]])]
     Param(
         # Использовать общие файлы
-        [switch]$UseCommonFiles = $False,
-        [string[]]$UseFilesFromDirectories
+        [switch]$UseCommonFiles,
+        [string[]]$UseFilesFromDirectories,
+        [ValidateSet('ConnectionStrings','Files')]
+        [string]$ReturnValue = 'ConnectionStrings'
     )
 
-    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
-    # TODO http://yellow-erp.com/page/guides/adm/service-files-description-and-location/
+    $commonIbFiles = @()
 
+    if ($UseFilesFromDirectories)
+    {
+        $commonIbFiles += Get-ChildItem $UseFilesFromDirectories -File -Filter *.v8i
+    }
+    
+    if ($UseCommonFiles -and (Test-Path "$ENV:APPDATA\1C\1CEStart\ibases.v8i"))
+    {
+        $commonIbFiles += Get-Item "$ENV:APPDATA\1C\1CEStart\ibases.v8i"
+    }
+
+    if ($UseCommonFiles -and (Test-Path "$ENV:ALLUSERSPROFILE\1C\1CEStart\ibases.v8i"))
+    {
+        $commonIbFiles += Get-Item "$ENV:ALLUSERSPROFILE\1C\1CEStart\ibases.v8i"
+    }
+    
     $list = @()
 
-    # TODO 
+    switch( $ReturnValue )
+    {
+        'ConnectionStrings'
+        {
+            $list += $commonIbFiles | Select-String -Pattern '\s*Connect\s*\=.*$'
+        }
+        'Files'
+        {
+            $list += $commonIbFiles
+        }
+    }
 
     $list
     
@@ -2102,6 +2147,7 @@ Param(
     [Security.SecureString]$password,
 
     [Parameter(Mandatory=$false)]
+    [ValidateScript({ -not $Text })]
     [ValidateSet(
         ,'Базы создающие нагрузку на диск'
         ,'Длительные транзакции'
@@ -2127,7 +2173,7 @@ Param(
                 )]
     [string]$Data,
     
-    [ValidateScript({ $null -eq $Data })]
+    [ValidateScript({ -not $Data })]
     [string]$Text
     )
 

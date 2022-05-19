@@ -211,7 +211,7 @@ DROP TABLE T1
 -- Наиболее часто выполняемые запросы
 SELECT TOP 10
   [Execution count] = execution_count
-, [Invalid Query] = SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1,
+, [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1,
                     (CASE WHEN qs.statement_end_offset = -1
                      THEN LEN(CONVERT(NVARCHAR(MAX), qt.text))*2
                      ELSE qs.statement_end_offset END - qs.statement_start_offset) / 2 + 1)
@@ -325,24 +325,6 @@ CROSS APPLY sys.dm_exec_sql_text(CONN_INFO.most_recent_sql_handle) AS SQL_TEXT
   ON SESSION_TRAN.session_id = PLAN_INFO.session_id
 ORDER BY transaction_begin_time ASC
 GO
--- end
-
-
--- Наиболее часто выполняемые запросы
-select top 100
-  [Execution count] = execution_count
-, [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset/2 + 1, 
-                                  (case 
-                                    when qs.statement_end_offset = -1 
-                                      then len(convert(nvarchar(max), qt.text)) * 2 
-                                    else qs.statement_end_offset 
-                                    end - qs.statement_start_offset) / 2 + 1)
-, [Parent Query] = qt.text
-, [Database name] = db_name(qt.dbid)
-from sys.dm_exec_query_stats qs
-cross apply sys.dm_exec_sql_text(qs.sql_handle) as qt
-order by [Execution count] desc
-go
 -- end
 
 

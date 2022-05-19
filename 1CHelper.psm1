@@ -2102,19 +2102,29 @@ Param(
     [Security.SecureString]$password,
 
     [Parameter(Mandatory=$false)]
-    [ValidateSet('Список длительных транзакций'
-                ,'Свободно в tempdb'
-                ,'Использование кешей по базам данных сервера СУБД'
-                ,'Использование кешей сервера СУБД'
-                ,'Запросы с высокими издержками на ввод/вывод'
-                ,'Наиболее часто выполняемые запросы'
-                ,'Длительные транзакции'
-                ,'Базы создающие нагрузку на диск'
-                ,'Наиболее часто выполняемые запросы'
-                ,'Топ запросов, создающих нагрузку на CPU на сервере СУБД за последний час'
-                ,'Наибольшая нагрузка на CPU'
-                ,'Нагрузка на CPU по базам'
-                ,)]
+    [ValidateSet(
+        ,'Базы создающие нагрузку на диск'
+        ,'Длительные транзакции'
+        ,'Запросы с высокими издержками на ввод/вывод'
+        ,'Использование кешей по базам данных сервера СУБД'
+        ,'Использование кешей сервера СУБД'
+        ,'Нагрузка на CPU по базам'
+        ,'Наиболее часто выполняемые запросы'
+        ,'Наибольшая нагрузка на CPU'
+        ,'Определение объема пространства, используемого внутренними объектами'
+        ,'Определение объема пространства, используемого пользовательскими объектами'
+        ,'Определение объема пространства, используемого хранилищем версий'
+        ,'Определение объема свободного пространства в tempdb'
+        ,'Получение пространства, занимаемого внутренними объектами в текущем сеансе как для выполнения, так и для выполнения задач'
+        ,'Получение пространства, занимаемого внутренними объектами во всех текущих выполняемых задачах в каждом сеансе'
+        ,'Проверка включена ли опция оптимизации tempdb по памяти'
+        ,'Проверка текущего размера и параметра авторасширения tempdb'
+        ,'Проверка фрагментации индекса хранилища столбцов'
+        ,'Свободно в tempdb'
+        ,'Список длительных транзакций'
+        ,'Топ запросов, создающих нагрузку на CPU на сервере СУБД за последний час'
+        ,'Фрагментация и плотность страниц индекса хранилища строк'
+                )]
     [string]$Data,
     
     [ValidateScript({ $null -eq $Data })]
@@ -2122,6 +2132,126 @@ Param(
     )
 
     switch ( $Data ) {
+        'Получение пространства, занимаемого внутренними объектами во всех текущих выполняемых задачах в каждом сеансе'
+        {
+            $sql = @'
+SELECT session_id,
+  SUM(internal_objects_alloc_page_count) AS task_internal_objects_alloc_page_count,
+  SUM(internal_objects_dealloc_page_count) AS task_internal_objects_dealloc_page_count
+FROM sys.dm_db_task_space_usage
+GROUP BY session_id;
+'@
+        }
+        'Получение пространства, занимаемого внутренними объектами в текущем сеансе как для выполнения, так и для выполнения задач'
+        {
+            $sql = @'
+SELECT R2.session_id,
+  R1.internal_objects_alloc_page_count
+  + SUM(R2.internal_objects_alloc_page_count) AS session_internal_objects_alloc_page_count,
+  R1.internal_objects_dealloc_page_count
+  + SUM(R2.internal_objects_dealloc_page_count) AS session_internal_objects_dealloc_page_count
+FROM sys.dm_db_session_space_usage AS R1
+INNER JOIN sys.dm_db_task_space_usage AS R2 ON R1.session_id = R2.session_id
+GROUP BY R2.session_id, R1.internal_objects_alloc_page_count,
+  R1.internal_objects_dealloc_page_count;
+'@
+        }
+        'Определение объема свободного пространства в tempdb'
+        {
+            $sql = @'
+SELECT SUM(unallocated_extent_page_count) AS [free pages],
+  (SUM(unallocated_extent_page_count)*1.0/128) AS [free space in MB]
+FROM tempdb.sys.dm_db_file_space_usage;
+'@
+        }
+        'Определение объема пространства, используемого хранилищем версий'
+        {
+            $sql = @'
+SELECT SUM(version_store_reserved_page_count) AS [version store pages used],
+  (SUM(version_store_reserved_page_count)*1.0/128) AS [version store space in MB]
+FROM tempdb.sys.dm_db_file_space_usage;
+'@
+        }
+        'Определение объема пространства, используемого внутренними объектами'
+        {
+            $sql = @'
+SELECT SUM(internal_object_reserved_page_count) AS [internal object pages used],
+  (SUM(internal_object_reserved_page_count)*1.0/128) AS [internal object space in MB]
+FROM tempdb.sys.dm_db_file_space_usage;
+'@
+        }
+        'Определение объема пространства, используемого пользовательскими объектами'
+        {
+            $sql = @'
+SELECT SUM(user_object_reserved_page_count) AS [user object pages used],
+  (SUM(user_object_reserved_page_count)*1.0/128) AS [user object space in MB]
+FROM tempdb.sys.dm_db_file_space_usage;
+'@
+        }
+        'Проверка включена ли опция оптимизации tempdb по памяти'
+        {
+            $sql = @'
+SELECT SERVERPROPERTY('IsTempdbMetadataMemoryOptimized')
+'@
+        }
+        'Проверка текущего размера и параметра авторасширения tempdb'
+        {
+            $sql = @'
+SELECT name AS FileName,
+    size*1.0/128 AS FileSizeInMB,
+    CASE max_size
+        WHEN 0 THEN 'Autogrowth is off.'
+        WHEN -1 THEN 'Autogrowth is on.'
+        ELSE 'Log file grows to a maximum size of 2 TB.'
+    END,
+    growth AS 'GrowthValue',
+    'GrowthIncrement' =
+        CASE
+            WHEN growth = 0 THEN 'Size is fixed.'
+            WHEN growth > 0 AND is_percent_growth = 0
+                THEN 'Growth value is in 8-KB pages.'
+            ELSE 'Growth value is a percentage.'
+        END
+FROM tempdb.sys.database_files;
+'@
+        }
+        'Проверка фрагментации индекса хранилища столбцов '
+        {
+            $sql = @'
+SELECT OBJECT_SCHEMA_NAME(i.object_id) AS schema_name,
+       OBJECT_NAME(i.object_id) AS object_name,
+       i.name AS index_name,
+       i.type_desc AS index_type,
+       100.0 * (ISNULL(SUM(rgs.deleted_rows), 0)) / NULLIF(SUM(rgs.total_rows), 0) AS avg_fragmentation_in_percent
+FROM sys.indexes AS i
+INNER JOIN sys.dm_db_column_store_row_group_physical_stats AS rgs
+ON i.object_id = rgs.object_id
+   AND
+   i.index_id = rgs.index_id
+WHERE rgs.state_desc = 'COMPRESSED'
+GROUP BY i.object_id, i.index_id, i.name, i.type_desc
+ORDER BY schema_name, object_name, index_name, index_type;
+'@
+        }
+        'Фрагментация и плотность страниц индекса хранилища строк'
+        {
+            $sql = @'
+SELECT OBJECT_SCHEMA_NAME(ips.object_id) AS schema_name,
+       OBJECT_NAME(ips.object_id) AS object_name,
+       i.name AS index_name,
+       i.type_desc AS index_type,
+       ips.avg_fragmentation_in_percent,
+       ips.avg_page_space_used_in_percent,
+       ips.page_count,
+       ips.alloc_unit_type_desc
+FROM sys.dm_db_index_physical_stats(DB_ID(), default, default, default, 'SAMPLED') AS ips
+INNER JOIN sys.indexes AS i 
+ON ips.object_id = i.object_id
+   AND
+   ips.index_id = i.index_id
+ORDER BY page_count DESC
+'@
+        }
         'Нагрузка на CPU по базам'
         {
             $sql = @'
@@ -2281,24 +2411,6 @@ cross apply sys.dm_exec_sql_text(qs.sql_handle) as qt
 order by [Average IO] desc
 '@
         }
-        'Наиболее часто выполняемые запросы'
-        {
-            $sql = @'
-select top 100
-  [Execution count] = execution_count
-, [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset/2 + 1, 
-                                    (case 
-                                        when qs.statement_end_offset = -1 
-                                        then len(convert(nvarchar(max), qt.text)) * 2 
-                                        else qs.statement_end_offset 
-                                        end - qs.statement_start_offset) / 2 + 1)
-, [Parent Query] = qt.text
-, [Database name] = db_name(qt.dbid)
-from sys.dm_exec_query_stats qs
-cross apply sys.dm_exec_sql_text(qs.sql_handle) as qt
-order by [Execution count] desc
-'@
-        }
         'Длительные транзакции'
         {
             $sql = @'
@@ -2407,13 +2519,15 @@ order by wait_time_ms desc
         {
             $sql = @'
 SELECT TOP 10
-[Execution count] = execution_count
-, [Invalid Query] = SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1,
-                                (CASE WHEN qs.statement_end_offset = -1
-                                THEN LEN(CONVERT(NVARCHAR(MAX), qt.text))*2
-                                ELSE qs.statement_end_offset END - qs.statement_start_offset) / 2 + 1)
-, [Parent Query] = qt.text
-, [Database Name] = db_name(qt.dbid)
+    [Execution count] = execution_count
+    , [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1,
+                                    (CASE 
+                                        WHEN qs.statement_end_offset = -1
+                                            THEN LEN(CONVERT(NVARCHAR(MAX), qt.text))*2
+                                        ELSE qs.statement_end_offset
+                                    END - qs.statement_start_offset) / 2 + 1)
+    , [Parent Query] = qt.text
+    , [Database Name] = db_name(qt.dbid)
 FROM sys.dm_exec_query_stats qs
 CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) as qt
 ORDER BY [Execution count] DESC
@@ -2427,10 +2541,17 @@ ORDER BY [Execution count] DESC
 
     Write-Verbose "Текст запроса`n`n$sql`n`n"
 
-    Write-Verbose "Подключение к 'Server=$Server;Database=$Database;'"
+    $connectionString = "Server=$Server"
+    if ($Database)
+    {
+        $connectionString += ";Database=$Database"
+    }
+
+    Write-Verbose "Подключение к '$connectionString'"
+
     $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
     $PlainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
-    $connection = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList "Server=$Server;Database=$Database;Uid=$user;Pwd=$PlainPassword"
+    $connection = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList "$connectionString;Uid=$user;Pwd=$PlainPassword"
     $connection.Open()
     
     if ($connection.State -eq 'Open')

@@ -2079,70 +2079,376 @@ function Get-NetHaspIniFilePath
 
 
 .EXAMPLE
-    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data Custom -Text 'select @@version'
+    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Text 'select @@version'
 
 .EXAMPLE
-    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data DatabaseLocks -Verbose
+    Invoke-SqlQuery -Server test.contoso.com -Database test -user admin -password admin -Data 'Свободно в tempdb' -Verbose
 
 .EXAMPLE
-    Invoke-SqlQuery -Server test.contoso.com -user admin -password admin -Data CurrentExequtingQueries -Verbose
+    Invoke-SqlQuery -Server test.contoso.com -user admin -password admin -Data 'Наибольшая нагрузка на CPU' -Verbose
 
 #>
 function Invoke-SqlQuery
 {
 Param(
     [string]$Server='local',
+    
     [string]$Database='master',
+    
     [Parameter(Mandatory=$true)]
     [string]$user,
+    
     [Parameter(Mandatory=$true)]
     [Security.SecureString]$password,
-    [Parameter(Mandatory=$true)]
-    [ValidateSet('DatabaseLocks','CurrentExequtingQueries','Custom')]
-    [string]$Data='Custom',
+
+    [Parameter(Mandatory=$false)]
+    [ValidateSet('Список длительных транзакций'
+                ,'Свободно в tempdb'
+                ,'Использование кешей по базам данных сервера СУБД'
+                ,'Использование кешей сервера СУБД'
+                ,'Запросы с высокими издержками на ввод/вывод'
+                ,'Наиболее часто выполняемые запросы'
+                ,'Длительные транзакции'
+                ,'Базы создающие нагрузку на диск'
+                ,'Наиболее часто выполняемые запросы'
+                ,'Топ запросов, создающих нагрузку на CPU на сервере СУБД за последний час'
+                ,'Наибольшая нагрузка на CPU'
+                ,'Нагрузка на CPU по базам'
+                ,)]
+    [string]$Data,
+    
+    [ValidateScript({ $null -eq $Data })]
     [string]$Text
     )
 
     switch ( $Data ) {
-        'DatabaseLocks'
+        'Нагрузка на CPU по базам'
         {
-            $scriptPath = (Get-NetHaspDirectoryPath).TrimEnd('hasp') + 'sql\batabase locks.sql'
-            $sql = Get-Content $scriptPath -ErrorAction Stop
+            $sql = @'
+WITH DB_CPU_Stats
+AS
+(SELECT DatabaseID, DB_Name(DatabaseID) AS [DatabaseName], SUM(total_worker_time) AS [CPU_Time_Ms]
+FROM sys.dm_exec_query_stats AS qs
+CROSS APPLY (SELECT CONVERT(int, value) AS [DatabaseID]
+                FROM sys.dm_exec_plan_attributes(qs.plan_handle)
+                WHERE attribute = N'dbid') AS F_DB
+GROUP BY DatabaseID)
+SELECT ROW_NUMBER() OVER(ORDER BY [CPU_Time_Ms] DESC) AS [row_num],
+    DatabaseName, [CPU_Time_Ms],
+    CAST([CPU_Time_Ms] * 1.0 / SUM([CPU_Time_Ms]) OVER() * 100.0 AS DECIMAL(5,2)) AS [CPUPercent]
+FROM DB_CPU_Stats
+WHERE DatabaseID > 4 -- system databases
+AND DatabaseID <> 32767 -- ResourceDB
+ORDER BY row_num OPTION (RECOMPILE)
+'@
         }
-        'CurrentExequtingQueries'
+        'Наибольшая нагрузка на CPU'
         {
-            $scriptPath = (Get-NetHaspDirectoryPath).TrimEnd('hasp') + 'sql\current executing queries.sql'
-            $sql = Get-Content $scriptPath -ErrorAction Stop
+            $sql = @'
+SELECT TOP 10
+    [Average CPU used] = total_worker_time / qs.execution_count
+    , [Total CPU used] = total_worker_time
+    , [Execution count] = qs.execution_count
+    , [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1, 
+                                        (CASE 
+                                            WHEN qs.statement_end_offset = -1 
+                                                THEN LEN(CONVERT(NVARCHAR(MAX), qt.text)) * 2 
+                                            ELSE qs.statement_end_offset 
+                                        END - qs.statement_start_offset) / 2 + 1)
+    , [Parent Query] = qt.text
+    , DatabaseName = DB_NAME(qt.dbid)
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) as qt
+ORDER BY [Average CPU used] DESC
+'@
         }
-        default
+        'Топ запросов, создающих нагрузку на CPU на сервере СУБД за последний час'
+        {
+            $sql = @'
+SELECT
+SUM(qs.max_elapsed_time) as elapsed_time,
+SUM(qs.total_worker_time) as worker_time
+INTO T1 FROM (
+    SELECT TOP 100000
+    *
+    FROM sys.dm_exec_query_stats qs
+    WHERE qs.last_execution_time > (CURRENT_TIMESTAMP - '01:00:00.000')
+    ORDER BY qs.last_execution_time DESC
+) as qs
+;
+SELECT TOP 10000
+(qs.max_elapsed_time) as elapsed_time,
+(qs.total_worker_time) as worker_time,
+qp.query_plan,
+st.text,
+dtb.name,
+qs.*,
+st.dbid
+INTO T2
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_query_plan(qs.plan_handle) qp
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) st
+LEFT OUTER JOIN sys.databases as dtb on st.dbid = dtb.database_id
+WHERE qs.last_execution_time > (CURRENT_TIMESTAMP - '01:00:00.000')
+ORDER BY qs.last_execution_time DESC
+;
+SELECT TOP 100
+(T2.elapsed_time*100/T1.elapsed_time) as percent_elapsed_time,
+(T2.worker_time*100/T1.worker_time) as percent_worker_time,
+T2.*
+FROM
+T2 as T2
+INNER JOIN T1 as T1
+ON 1=1
+ORDER BY T2.worker_time DESC
+;
+DROP TABLE T2
+;
+DROP TABLE T1
+;
+'@
+        }
+        'Наибольшая нагрузка на CPU'
+        {
+            $sql = @'
+SELECT TOP 10
+    [Average CPU used] = total_worker_time / qs.execution_count
+    , [Total CPU used] = total_worker_time
+    , [Execution count] = qs.execution_count
+    , [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1, 
+                                        (CASE 
+                                        WHEN qs.statement_end_offset = -1 
+                                            THEN LEN(CONVERT(NVARCHAR(MAX), qt.text)) * 2 
+                                        ELSE qs.statement_end_offset 
+                                        END - qs.statement_start_offset) / 2 + 1)
+    , [Parent Query] = qt.text
+    , DatabaseName = DB_NAME(qt.dbid)
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) as qt
+ORDER BY [Average CPU used] DESC
+'@
+        }
+        'Список длительных транзакций'
+        {
+            $sql = @'
+select
+  transaction_id, *
+from sys.dm_tran_active_snapshot_database_transactions
+order by elapsed_time_seconds desc
+'@
+        }
+        'Свободно в tempdb'
+        {
+            $sql = @'
+select 
+  sum(unallocated_extent_page_count) as [free pages]
+  , (sum(unallocated_extent_page_count)*1.0/128) as [free space in MB]
+from sys.dm_db_file_space_usage
+'@
+        }
+        'Использование кешей по базам данных сервера СУБД'
+        {
+            $sql = @'
+select db_name(database_id) as [Database name], count(row_count)*8.00/1024.00 as MB, count(row_count)*8.00/1024.00/1024.00 as GB
+from sys.dm_os_buffer_descriptors
+group by database_id
+order by MB desc
+'@
+        }
+        'Использование кешей сервера СУБД'
+        {
+            $sql = @'
+select top(100)
+[type]
+, sum(pages_kb) as [SPA Mem, Kb]
+from sys.dm_os_memory_clerks t
+group by [type]
+order by sum(pages_kb) desc
+'@
+        }
+        'Запросы с высокими издержками на ввод/вывод'
+        {
+            $sql = @'
+select top 100
+  [Average IO] = (total_logical_reads + total_logical_writes) / qs.execution_count
+, [Total IO] = (total_logical_reads + total_logical_writes)
+, [Execution count] = qs.execution_count
+, [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset/2 + 1, (case when qs.statement_end_offset = -1 then len(convert(nvarchar(max), qt.text)) * 2 else qs.statement_end_offset end - qs.statement_start_offset)/2)
+, [Parent Query] = qt.text
+, [Database name] = db_name(qt.dbid)
+from sys.dm_exec_query_stats qs
+cross apply sys.dm_exec_sql_text(qs.sql_handle) as qt
+order by [Average IO] desc
+'@
+        }
+        'Наиболее часто выполняемые запросы'
+        {
+            $sql = @'
+select top 100
+  [Execution count] = execution_count
+, [Individual Query] = SUBSTRING(qt.text, qs.statement_start_offset/2 + 1, 
+                                    (case 
+                                        when qs.statement_end_offset = -1 
+                                        then len(convert(nvarchar(max), qt.text)) * 2 
+                                        else qs.statement_end_offset 
+                                        end - qs.statement_start_offset) / 2 + 1)
+, [Parent Query] = qt.text
+, [Database name] = db_name(qt.dbid)
+from sys.dm_exec_query_stats qs
+cross apply sys.dm_exec_sql_text(qs.sql_handle) as qt
+order by [Execution count] desc
+'@
+        }
+        'Длительные транзакции'
+        {
+            $sql = @'
+DECLARE @curr_date as DATETIME
+SET @curr_date = GETDATE()
+SELECT
+    -- SESSION_TRAN.*,
+    SESSION_TRAN.session_id AS ConnectionID, -- "Соединение с СУБД" в консоли кластера 1С
+    -- TRAN_INFO.*,
+    TRAN_INFO.transaction_begin_time,
+    DateDiff(MINUTE, TRAN_INFO.transaction_begin_time, @curr_date) AS Duration, -- Длительность в минутах
+    TRAN_INFO.transaction_type,
+    -- 1 = транзакция чтения-записи;
+    -- 2 = транзакция только для чтения;
+    -- 3 = системная транзакция;
+    -- 4 = распределенная транзакция.
+    TRAN_INFO.transaction_state,
+    -- 0 = транзакция ещё не была полностью инициализирована;
+    -- 1 = транзакция была инициализирована, но ещё не началась;
+    -- 2 = транзакция активна;
+    -- 3 = транзакция закончилась;
+    -- 4 = фиксирующий процесс был инициализирован на распределенной транзакции. Предназначено только для распределенных транзакций. Распределенная транзакция все еще активна, на дальнейшая обработка не может иметь место;
+    -- 5 = транзакция находится в готовом состоянии и ожидает разрешения;
+    -- 6 = транзакция зафиксирована;
+    -- 7 = проводится откат транзакции;
+    -- 8 = откат транзакции был выполнен.
+    -- CONN_INFO.*,
+    CONN_INFO.connect_time,
+    CONN_INFO.num_reads,
+    CONN_INFO.num_writes,
+    CONN_INFO.last_read,
+    CONN_INFO.last_write,
+    CONN_INFO.client_net_address,
+    CONN_INFO.most_recent_sql_handle,
+    -- SQL_TEXT.*,
+    SQL_TEXT.dbid,
+    db_name(SQL_TEXT.dbid) as IB_NAME,
+    SQL_TEXT.text,
+    -- QUERIES_INFO.*,
+    QUERIES_INFO.start_time,
+    QUERIES_INFO.status,
+    QUERIES_INFO.command,
+    QUERIES_INFO.wait_type,
+    QUERIES_INFO.wait_time,
+    -- PLAN_INFO.*,
+    PLAN_INFO.query_plan
+FROM sys.dm_tran_session_transactions AS SESSION_TRAN
+    JOIN sys.dm_tran_active_transactions as TRAN_INFO
+    ON SESSION_TRAN.transaction_id = TRAN_INFO.transaction_id
+    LEFT JOIN sys.dm_exec_connections AS CONN_INFO
+    ON SESSION_TRAN.session_id = CONN_INFO.session_id
+CROSS APPLY sys.dm_exec_sql_text(CONN_INFO.most_recent_sql_handle) AS SQL_TEXT
+    LEFT JOIN sys.dm_exec_requests AS QUERIES_INFO
+    ON SESSION_TRAN.session_id = QUERIES_INFO.session_id
+    LEFT JOIN (
+    SELECT
+    VL_SESSION_TRAN.session_id AS session_id,
+    VL_PLAN_INFO.query_plan AS query_plan
+    FROM sys.dm_tran_session_transactions AS VL_SESSION_TRAN
+    INNER JOIN sys.dm_exec_requests AS VL_QUERIES_INFO
+    ON VL_SESSION_TRAN.session_id = VL_QUERIES_INFO.session_id
+    CROSS APPLY sys.dm_exec_text_query_plan(VL_QUERIES_INFO.plan_handle, VL_QUERIES_INFO.statement_start_offset, VL_QUERIES_INFO.statement_end_offset) AS VL_PLAN_INFO) AS PLAN_INFO
+    ON SESSION_TRAN.session_id = PLAN_INFO.session_id
+ORDER BY transaction_begin_time ASC
+'@
+        }
+        'Базы создающие нагрузку на диск'
+        {
+            $sql = @'
+with
+DB_Disk_Reads_Stats
+as
+(
+    select DatabaseID, db_name(DatabaseID) as DatabaseName, sum(total_physical_reads) as physical_reads
+    from sys.dm_exec_query_stats qs
+cross apply (select convert(int, value) as DatabaseID
+    from sys.dm_exec_plan_attributes(qs.plan_handle)
+    where attribute = N'dbid') as F_DB
+    group by DatabaseID
+)
+select ROW_NUMBER() OVER(ORDER BY [physical_reads] desc) as [row_num],
+  DatabaseName, [physical_reads],
+  CAST([physical_reads]*1.0/sum([physical_reads]) OVER() * 100.0 AS decimal(5, 2)) as [Physical_Reads_Percent]
+from DB_Disk_Reads_Stats
+where DatabaseID > 4 -- system databases
+  and DatabaseID <> 32767
+-- ResourceDB
+order by row_num
+OPTION
+  (RECOMPILE)
+'@
+        }
+        'Текущая статистика по задержкам'
+        {
+            $sql = @'
+select top 100
+  [Wait type] = wait_type,
+  [Wait time (s)] = wait_time_ms / 1000,
+  [% waiting] = convert(decimal(12,2), wait_time_ms * 100.0 / sum(wait_time_ms) OVER())
+from sys.dm_os_wait_stats
+where wait_type not like '%SLEEP%'
+order by wait_time_ms desc
+'@
+        }
+        'Наиболее часто выполняемые запросы'
+        {
+            $sql = @'
+SELECT TOP 10
+[Execution count] = execution_count
+, [Invalid Query] = SUBSTRING(qt.text, qs.statement_start_offset / 2 + 1,
+                                (CASE WHEN qs.statement_end_offset = -1
+                                THEN LEN(CONVERT(NVARCHAR(MAX), qt.text))*2
+                                ELSE qs.statement_end_offset END - qs.statement_start_offset) / 2 + 1)
+, [Parent Query] = qt.text
+, [Database Name] = db_name(qt.dbid)
+FROM sys.dm_exec_query_stats qs
+CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) as qt
+ORDER BY [Execution count] DESC
+'@
+        }
+        default # не "Custom", т.к. проверяется параметр "Data"
         {
             $sql = $Text
         }
     }
 
+    Write-Verbose "Текст запроса`n`n$sql`n`n"
+
     Write-Verbose "Подключение к 'Server=$Server;Database=$Database;'"
     $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($password)
     $PlainPassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
     $connection = New-Object -TypeName System.Data.SqlClient.SqlConnection -ArgumentList "Server=$Server;Database=$Database;Uid=$user;Pwd=$PlainPassword"
-    try {
-        $connection.Open()
-    } catch {
-        Write-Error $_
-    }
-    $command = New-Object -TypeName System.Data.SqlClient.SqlCommand $sql, $connection -ErrorAction Stop
-
-    $adapter = New-Object -TypeName System.Data.SqlClient.SqlDataAdapter $command
-    $table = New-Object -TypeName System.Data.DataTable
-
-    $rows = $adapter.Fill($table)
+    $connection.Open()
     
-    Write-Verbose "Получено $rows строк(-а)"
+    if ($connection.State -eq 'Open')
+    {
+        $command = New-Object -TypeName System.Data.SqlClient.SqlCommand $sql, $connection -ErrorAction Stop
 
-    $connection.Close()
-    $connection.Dispose()
+        $adapter = New-Object -TypeName System.Data.SqlClient.SqlDataAdapter $command
+        $table = New-Object -TypeName System.Data.DataTable
 
-    $table
+        $rows = $adapter.Fill($table)
+        
+        Write-Verbose "Получено $rows строк(-а)"
 
+        $connection.Close()
+        $connection.Dispose()
+
+        $table
+    }
 }
 
 

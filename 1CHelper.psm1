@@ -695,6 +695,7 @@ function Remove-NotUsedObjects
 function Find-1CEstart
 {
     Param(
+        [CmdletBinding()]
         # Имя компьютера для поиска версии
         [string]$ComputerName = $env:COMPUTERNAME
     )
@@ -722,12 +723,12 @@ function Find-1CEstart
          $regkey = $reg.OpenSubKey( $key.path )
 
          If( -not $regkey ) {
-             Write-Warning "Не найдены ключи в: $($string.leaf)\\$($string.path)"
+            $index = 0
+         } else {
+            $defaultValue = $regkey.GetValue("").ToString()
+            $index = $defaultValue.IndexOf("1cestart.exe")
          }
-
-         $defaultValue = $regkey.GetValue("").ToString()
-
-         $index = $defaultValue.IndexOf("1cestart.exe")
+         
 
          if ( $index -gt 0 ) {
 
@@ -748,24 +749,22 @@ function Find-1CEstart
 
     # если не удалось найти, то пробуем через WinRM
 
-    if ( -not $pathToStarter -and $ComputerName -ne $env:COMPUTERNAME ) {
+    if ( -not $pathToStarter ) {
+        
+        $scriptBlock = {
+            if (Test-Path "${env:ProgramFiles}\1cv8\common\1cestart.exe" ) {
+                "${env:ProgramFiles}\1cv8\common\1cestart.exe"
+            }
+            elseif ( Test-Path "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" ) {
+                "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" 
+            }
+            elseif ( Test-Path "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe" ) {
+                "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe"
+            }
+            else { $null }
+        }
 
-        $pathToStarter = Invoke-Command -ComputerName $ComputerName -ScriptBlock { 
-                            if ( Test-Path "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" ) {
-                                "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" 
-                            } elseif ( Test-Path "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe" ) {
-                                "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe"
-                            } else { $null } 
-                         } -ErrorAction Continue
-
-    } elseif ( -not $pathToStarter ) {
-
-        $pathToStarter = if ( Test-Path "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" ) {
-                                "${env:ProgramFiles(x86)}\1cv8\common\1cestart.exe" 
-                            } elseif ( Test-Path "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe" ) {
-                                "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe"
-                            } else { $null }
-                              
+        $pathToStarter = if ( $ComputerName -ne $env:COMPUTERNAME ) { Invoke-Command -ComputerName $ComputerName -ScriptBlock $scriptBlock -ErrorAction Continue} else { $scriptBlock.Invoke() }
     }
 
     $pathToStarter

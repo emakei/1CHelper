@@ -69,11 +69,11 @@ function Remove-1CTempDirs
 .OUTPUTS
    Массив строк технологического журнала
 .EXAMPLE
-   $table = Get-TechJournalLOGtable 'C:\LOG\rmngr_1908\17062010.log'
+   $table = Get-1CTechJournalLOGtable 'C:\LOG\rmngr_1908\17062010.log'
 .EXAMPLE
-   $table = Get-TechJournalLOGtable 'C:\LOG\' -Verbose
+   $table = Get-1CTechJournalLOGtable 'C:\LOG\' -Verbose
 #>
-function Get-TechJournalLOGtable
+function Get-1CTechJournalLOGtable
 {
     [CmdletBinding()]
     [OutputType([Object[]])]
@@ -149,11 +149,11 @@ function Get-TechJournalLOGtable
 .LINK  
     https://github.com/emakei/1CHelper.psm1
 .EXAMPLE
-   Get-APDEX-Data C:\APDEX\2017-05-16 07-02-54.xml
+   Get-1CAPDEXinfo C:\APDEX\2017-05-16 07-02-54.xml
 .EXAMPLE
-   Get-APDEX-Data C:\APDEX\ -Verbose
+   Get-1CAPDEXinfo C:\APDEX\ -Verbose
 #>
-function Get-APDEXinfo
+function Get-1CAPDEXinfo
 {
     [CmdletBinding()]
     [OutputType([Object[]])]
@@ -206,13 +206,13 @@ function Get-APDEXinfo
 .OUTPUTS
    Массив данных разбора текстовой информации журнала
 .EXAMPLE
-   Get-TechJournalData C:\LOG\rphost_280\17061412.log
+   Get-1CTechJournalData C:\LOG\rphost_280\17061412.log
    $properties = $tree | % { $_.Groups['name'].Captures } | select -Unique
 .EXAMPLE
-   Get-TechJournalData C:\LOG\ -Verbose
+   Get-1CTechJournalData C:\LOG\ -Verbose
    $tree | ? { $_.Groups['name'] -like '*Context*' } | % { $_.Groups['value'] } | Select Value -Unique | fl
 #>
-function Get-TechJournalData
+function Get-1CTechJournalData
 {
     [CmdletBinding()]
     [OutputType([Object[]])]
@@ -259,7 +259,7 @@ function Get-TechJournalData
    Удаление элементов конфигурации с синонимом "(не используется)"
 
 .EXAMPLE
-   PS C:\> $modules = Remove-NotUsedObjects E:\TEMP\ExportingConfiguration
+   PS C:\> $modules = Remove-1CNotUsedObjects E:\TEMP\ExportingConfiguration
    PS C:\> $gr = $modules | group File, Object | select -First 1
    PS C:\> ise ($gr.Group.File | select -First 1) # открываем модуль в новой вкладке ISE
    # альтернатива 'start notepad $gr.Group.File[0]'
@@ -282,7 +282,7 @@ function Get-TechJournalData
    Массив объектов с описанием файлов модулей и позиций, содержащих упоминания удаляемых объектов
 
 #>
-function Remove-NotUsedObjects
+function Remove-1CNotUsedObjects
 {
     [CmdletBinding(DefaultParameterSetName='pathToConfigurationFiles', 
                   SupportsShouldProcess=$true, 
@@ -785,22 +785,22 @@ function Find-1CEstart
     https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
-    Find-1C8conn -UseCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\") | select Line
+    Find-1C8conn -NoCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\") | select Line
 
 .EXAMPLE
-    Find-1C8conn -UseCommonFiles
+    Find-1C8conn | select Line
 
 .EXAMPLE
-    Find-1C8conn -UseCommonFiles -ReturnValue Files
+    Find-1C8conn -ReturnValue Files
 
 .EXAMPLE
     Find-1C8conn -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\")
 
 .EXAMPLE
-    Find-1C8conn -UseCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\")
+    Find-1C8conn -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\")
 
 .EXAMPLE
-    Find-1C8conn -UseCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\") -ReturnValue Files
+    Find-1C8conn -NoCommonFiles -UseFilesFromDirectories ("$ENV:USERPROFILE\Desktop","D:\") -ReturnValue Files
 
 .OUTPUTS
     Список совпадений по шаблону строки подключения в файлах
@@ -814,7 +814,7 @@ function Find-1C8conn
     [OutputType([Object[]])]
     Param(
         # Использовать общие файлы
-        [switch]$UseCommonFiles,
+        [switch]$NoCommonFiles,
         [string[]]$UseFilesFromDirectories,
         [ValidateSet('ConnectionStrings','Files')]
         [string]$ReturnValue = 'ConnectionStrings'
@@ -827,12 +827,12 @@ function Find-1C8conn
         $commonIbFiles += Get-ChildItem $UseFilesFromDirectories -File -Filter *.v8i
     }
     
-    if ($UseCommonFiles -and (Test-Path "$ENV:APPDATA\1C\1CEStart\ibases.v8i"))
+    if (-not $NoCommonFiles -and (Test-Path "$ENV:APPDATA\1C\1CEStart\ibases.v8i"))
     {
         $commonIbFiles += Get-Item "$ENV:APPDATA\1C\1CEStart\ibases.v8i"
     }
 
-    if ($UseCommonFiles -and (Test-Path "$ENV:ALLUSERSPROFILE\1C\1CEStart\ibases.v8i"))
+    if (-not $NoCommonFiles -and (Test-Path "$ENV:ALLUSERSPROFILE\1C\1CEStart\ibases.v8i"))
     {
         $commonIbFiles += Get-Item "$ENV:ALLUSERSPROFILE\1C\1CEStart\ibases.v8i"
     }
@@ -869,13 +869,13 @@ function Find-1C8conn
     https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
-    Get-1CclusterData
+    Get-1ClusterData
 
 .EXAMPLE
-    Get-1CclusterData 'srv-01','srv-02'
+    Get-1ClusterData 'srv-01','srv-02'
 
 .EXAMPLE
-    $netHaspParams = Get-NetHaspIniStrings
+    $netHaspParams = Get-1CNetHaspIniStrings
     $hostsToQuery += $netHaspParams.NH_SERVER_ADDR
     $hostsToQuery += $netHaspParams.NH_SERVER_NAME
     
@@ -884,7 +884,7 @@ function Find-1C8conn
 .OUTPUTS
     Данные кластера
 #>
-function Get-ClusterData
+function Get-1ClusterData
 {
 [OutputType([Object[]])]
 [CmdletBinding()]
@@ -1803,11 +1803,11 @@ End {
     https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
-    $data = Get-1CclusterData 1c-cluster.contoso.com -NoClusterAdmins -NoClusterManagers -NoWorkingServers -NoWorkingProcesses -NoClusterServices -ShowConnections None -ShowSessions Cluster -ShowLocks None -NoInfobases -NoAssignmentRules -User Example -Password Example
+    $data = Get-1CClusterData 1c-cluster.contoso.com -NoClusterAdmins -NoClusterManagers -NoWorkingServers -NoWorkingProcesses -NoClusterServices -ShowConnections None -ShowSessions Cluster -ShowLocks None -NoInfobases -NoAssignmentRules -User Example -Password Example
     Remove-1Csession -HostName $data.Clusters.HostName -MainPort $data.Clusters.MainPort -User Admin -Password Admin -SessionID 3076 -InfoBaseName TestDB -Verbose -NotCloseConnection
 
 #>
-function Remove-Session
+function Remove-1CSession
 {
 [CmdletBinding()]
 Param(
@@ -1943,12 +1943,12 @@ End {
     https://github.com/emakei/1CHelper.psm1
 
 .EXAMPLE
-   Get-NetHaspIniStrings
+   Get-1CNetHaspIniStrings
 
 .OUTPUTS
    Структура параметров
 #>
-function Get-NetHaspIniStrings
+function Get-1CNetHaspIniStrings
 {
     
     $struct = @{}
@@ -1990,9 +1990,10 @@ function Get-NetHaspIniStrings
 #>
 function Find-1CApplicationForExportImport
 {
+    [CmdletBinding()]
     Param(
         # Имя компьютера для поиска версии
-        [string]$ComputerName=''
+        [string]$ComputerName
     )
 
     $installationPath = $null
@@ -2006,7 +2007,7 @@ function Find-1CApplicationForExportImport
          Try {
              $reg=[Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine', $computerName)
          } Catch {
-             $_
+             Write-Error $_
              Continue
          }
  
@@ -2134,10 +2135,11 @@ function Get-NetHaspIniFilePath
 #>
 function Invoke-SqlQuery
 {
-Param(
+    [CmdletBinding()]
+Param (
     [string]$Server='local',
     
-    [string]$Database='master',
+    [string]$Database,
     
     [Parameter(Mandatory=$true)]
     [string]$user,
@@ -3353,4 +3355,4 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-NotUsedObjects, Find-1CEstart, Find-1C8conn, Get-ClusterData, Get-NetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-Session, Invoke-SqlQuery, Get-TechJournalData, Get-APDEXinfo, Get-TechJournalLOGtable, Remove-1CTempDirs
+Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport

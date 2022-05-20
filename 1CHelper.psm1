@@ -893,9 +893,11 @@ Param(
     [Parameter(Mandatory=$true)]
     [string]$HostName,
     # имя админитратора кластера
-    [string]$User="",
+    [Parameter(Mandatory=$true)]
+    [string]$User,
     # пароль администратора кластера
-    [Security.SecureString]$Password="",
+    [Parameter(Mandatory=$true)]
+    [Security.SecureString]$Password,
     # не получать инфорацию об администраторах кластера
     [switch]$NoClusterAdmins=$false,
     # не получать инфорацию о менеджерах кластера
@@ -920,7 +922,7 @@ Param(
     # не получать инфорацию о требованиях назначения
     [switch]$NoAssignmentRules=$false,
     # верия компоненты
-    [ValidateSet(2, 3, 4)]
+    [ValidateSet(2, 3)]
     [int]$Version=3
     )
 

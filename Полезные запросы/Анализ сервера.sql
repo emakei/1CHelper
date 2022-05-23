@@ -123,6 +123,26 @@ GO
 -- end
 
 
+-- Индексы с фрагментацией более 20%
+SELECT 
+	object_id, 
+	index_id, 
+	partition_number, 
+	avg_fragmentation_in_percent, 
+	db_name(database_id) as [db_name], 
+	ISNULL(avg_page_space_used_in_percent,100)
+FROM sys.dm_db_index_physical_stats(NULL, NULL, NULL, NULL, 'SAMPLED')
+WHERE avg_fragmentation_in_percent >= 20
+  		AND database_id IN (SELECT database_id
+  		    		    FROM sys.databases
+  				    WHERE [state] = 0 /* ONLINE */ AND is_read_only = 0 AND database_id > 4 /* SKIP SYSTEM DB */
+  				    -- Documentation : http://msdn.microsoft.com/en-us/library/ms178534.aspx
+  				    )
+ORDER BY
+	avg_fragmentation_in_percent DESC
+GO
+
+
 -- Нагрузка на CPU по базам
 WITH DB_CPU_Stats
 AS

@@ -2157,6 +2157,7 @@ Param (
         ,'Запросы с высокими издержками на ввод/вывод'
         ,'Использование кешей по базам данных сервера СУБД'
         ,'Использование кешей сервера СУБД'
+        ,'Используемые протоколы подключения'
         ,'Нагрузка на CPU по базам'
         ,'Наиболее часто выполняемые запросы'
         ,'Наибольшая нагрузка на CPU'
@@ -2580,6 +2581,15 @@ SELECT TOP 10
 FROM sys.dm_exec_query_stats qs
 CROSS APPLY sys.dm_exec_sql_text(qs.sql_handle) as qt
 ORDER BY [Execution count] DESC
+'@
+        }
+        'Используемые протоколы подключения'
+        {
+            $sql = @'
+select program_name,net_transport
+from sys.dm_exec_sessions as t1
+left join sys.dm_exec_connections AS t2 ON t1.session_id=t2.session_id
+where not t1.program_name is null
 '@
         }
         default # не "Custom", т.к. проверяется параметр "Data"

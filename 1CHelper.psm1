@@ -1994,20 +1994,24 @@ function Find-1CApplicationForExportImport
 {
     [CmdletBinding()]
     Param(
-        # Имя компьютера для поиска версии
-        [string]$ComputerName
+        
+    # Имя компьютера для поиска версии
+        [string]$ComputerName,
+
+        # Вывести все результаты
+        [switch]$AllInstances
     )
 
-    $installationPath = $null
+    $installationPath = if( $AllInstances ) { @() } else { $null }
 
     $pvs = 0
 
-    $UninstallPathes = @("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall","SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
+    $UninstallPaths = @("SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall","SOFTWARE\\Wow6432node\\Microsoft\\Windows\\CurrentVersion\\Uninstall")
    
-    ForEach($UninstallKey in $UninstallPathes) {
+    ForEach($UninstallKey in $UninstallPaths) {
         
          Try {
-             $reg=[Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine', $computerName)
+             $reg = [Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('LocalMachine', $ComputerName)
          } Catch {
              Write-Error $_
              Continue
@@ -2019,7 +2023,7 @@ function Find-1CApplicationForExportImport
              Write-Warning "Не найдены ключи в: HKLM:\\$UninstallKey"
          }
 
-         $subkeys=$regkey.GetSubKeyNames()
+         $subkeys = $regkey.GetSubKeyNames()
         
          foreach($key in $subkeys){
  
@@ -2050,7 +2054,12 @@ function Find-1CApplicationForExportImport
              }
              if ( $tmpPVS -gt $pvs -and ( Test-Path -LiteralPath $tmpPath) ) {
                  $pvs = $tmpPVS
-                 $installationPath = $tmpPath
+                 if ( $AllInstances ) {
+                    $installationPath += Get-Item $tmpPath
+                 }
+                 else {
+                    $installationPath = $tmpPath
+                 }
              }
  
          }
@@ -2059,7 +2068,87 @@ function Find-1CApplicationForExportImport
 
      }
 
-     $installationPath
+     # https://docs.microsoft.com/en-us/windows/win32/shell/app-registration
+     # В 'HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths' нету 1С
+     # как и в 'HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\App Paths'
+
+     # Поиск в доступных COM-классах
+
+     if ( -not $installationPath -or $AllInstances )
+     {
+        Try {
+            
+            $reg=[Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('ClassesRoot', $ComputerName)
+            
+            $regkey = $reg.OpenSubKey("CLSID")
+            
+            $subkeys = $regkey.GetSubKeyNames()
+
+            foreach( $subkey in $subkeys )
+            {
+                if ( $subkey -notmatch "\{\w{8}\-(\w{4}\-){3}\w{12}\}" )
+                {
+                    Continue
+                }
+
+                $curPath = "CLSID\\$subkey"
+
+                $curSubKey = $reg.OpenSubKey("$curPath\\VersionIndependentProgID")
+
+                if ( $curSubKey )
+                {
+                    
+                    $defaultKeyValue = $curSubKey.GetValue("")
+
+                    if ( $defaultKeyValue -eq 'V83.Application') {
+                        
+                        $curLocalServer32Path = "$curPath\\LocalServer32"
+
+                        $curLocalServer32Key = $reg.OpenSubKey($curLocalServer32Path)
+
+                        $curImagePath = $curLocalServer32Key.getValue("")
+
+                        if ( Test-Path $curImagePath ) {
+                            if ( $AllInstances ) {
+                                $installationPath += Get-Item $curImagePath
+                            } else {
+                                $installationPath = $curImagePath
+                            }
+                        }
+
+                    } elseif ( $defaultKeyValue -eq "V83.COMConnector" ) {
+  
+                        $curInprocServer32Path = "$curPath\\InprocServer32"
+
+                        $curInprocServer32Path = $reg.OpenSubKey($curInprocServer32Path)
+
+                        $curImagePath = $curInprocServer32Path.getValue("").Replace('comcntr.dll','1cv8.exe')
+
+                        if ( Test-Path $curImagePath ) {
+
+                            if ( $AllInstances ) {
+                                $installationPath += Get-Item $curImagePath
+                            } else {
+                                $installationPath = $curImagePath
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+
+        } Catch {
+            
+            Write-Error $_
+            Continue
+
+        }
+    }
+
+    $installationPath
 }
 
 <#

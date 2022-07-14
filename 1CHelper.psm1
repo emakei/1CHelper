@@ -761,6 +761,12 @@ function Find-1CEstart
             elseif ( Test-Path "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe" ) {
                 "${env:ProgramFiles(x86)}\1cv82\common\1cestart.exe"
             }
+            elseif ( Test-Path "$ENV:USERPROFILE\AppData\Local\Programs\1cv8" ) {
+                "$ENV:USERPROFILE\AppData\Local\Programs\1cv8\common\1cestart.exe"
+            }
+            elseif ( Test-Path "$ENV:USERPROFILE\AppData\Local\Programs\1cv8_x86" ) {
+                "$ENV:USERPROFILE\AppData\Local\Programs\1cv8_x86\common\1cestart.exe"
+            }
             else { $null }
         }
 
@@ -1791,6 +1797,238 @@ End {
 
 }
 
+
+
+function Get-1CRegisteredApplicationClasses {
+    
+    param (
+        
+        # Имя компьютера
+        [string]$ComputerName,
+
+        # Номер версии платформы
+        [ValidateScript({ $_ -match '\d\.\d\.\d+\.\d+' })]
+        [string]$Version
+
+    )
+    
+    $rv = @()
+
+    $reg=[Microsoft.Win32.RegistryKey]::OpenRemoteBaseKey('ClassesRoot', $ComputerName)
+            
+    $regkey = $reg.OpenSubKey("CLSID")
+    
+    $subkeys = $regkey.GetSubKeyNames()
+
+    foreach( $subkey in $subkeys )
+    {
+        if ( $subkey -notmatch "\{\w{8}\-(\w{4}\-){3}\w{12}\}" )
+        {
+            Continue
+        }
+
+        $curPath = "CLSID\\$subkey"
+
+        $curSubKey = $reg.OpenSubKey("$curPath\\VersionIndependentProgID")
+
+        if ( $curSubKey )
+        {
+            
+            $defaultKeyValue = $curSubKey.GetValue("")
+
+            if ( $defaultKeyValue -in @('V83.Application','V83C.Application') ) {
+                
+                $curLocalServer32Path = "$curPath\\LocalServer32"
+
+                $curLocalServer32Key = $reg.OpenSubKey($curLocalServer32Path)
+
+                $curImagePath = $curLocalServer32Key.getValue("")
+
+                if ( Test-Path $curImagePath ) {
+                    
+                    $rv += 1 | Select-Object @{ Name = 'VersionIndependentProgID'; Expression = { $defaultKeyValue } },
+                                             @{ Name = 'FilePath'; Expression = { $curImagePath } }, 
+                                             @{ Name = 'DirectoryName'; Expression = { ([System.IO.FileInfo]$curImagePath).DirectoryName }}
+
+                }
+
+            } elseif ( $defaultKeyValue -in @("V83.COMConnector","V83.ServerAbout","V83.ServerAdminScope") ) {
+
+                $curInprocServer32Path = "$curPath\\InprocServer32"
+
+                $curInprocServer32Path = $reg.OpenSubKey($curInprocServer32Path)
+
+                $curImagePath = $curInprocServer32Path.getValue("")
+
+                if ( Test-Path $curImagePath ) {
+
+                    $rv += 1 | Select-Object @{ Name = 'VersionIndependentProgID'; Expression = { $defaultKeyValue } },
+                                             @{ Name = 'FilePath'; Expression = { $curImagePath } }, 
+                                             @{ Name = 'DirectoryName'; Expression = { ([System.IO.FileInfo]$curImagePath).DirectoryName }}
+
+                }
+
+            }
+
+        }
+    
+    }
+
+    $rv
+
+}
+
+
+function Get-1CAppDirs {
+    param (
+        # Номер версии платформы
+        [ValidateScript({ $_ -match '\d\.\d\.\d+\.\d+' })]
+        [string]$Version
+    )
+    
+    $possibleAppDirs = @("${env:ProgramFiles}\1cv8", "${env:ProgramFiles(x86)}\1cv8", "$ENV:USERPROFILE\AppData\Local\Programs\1cv8_x86", "$ENV:USERPROFILE\AppData\Local\Programs\1cv8")
+    $possibleAppDirs = $possibleAppDirs | Where-Object { Test-Path $_ }
+
+    if ( $Version ) {
+        $pattern = $Version.Replace('.','\.')
+    } else {
+        $pattern = '\d\.\d\.\d+\.\d+'
+    }
+
+    $ENV:H1CAPPDIRS = @()
+    ( Get-ChildItem -Directory -Path $possibleAppDirs | Where-Object { $_ -match $pattern } ).FullName | Select-Object -Unique | ForEach-Object { $ENV:H1CAPPDIRS += "$_\bin;" }
+    ( Get-1CRegisteredApplicationClasses ).DirectoryName | Where-Object { $_ -match $pattern } | Select-Object -Unique | Where-Object { -not $ENV:H1CAPPDIRS.Contains($_) } | ForEach-Object { $ENV:H1CAPPDIRS += "$_;" }
+    
+    $ENV:H1CAPPDIRS
+
+}
+
+<#
+.SYNOPSIS
+    Установить используемую версию платформы для rac.exe на время сеанса
+#>
+function Set-RACversion {
+    param (
+        # Номер версии платформы
+        [ValidateScript({ $_ -match '\d\.\d\.\d+\.\d+' })]
+        [string]$Version
+    )
+    
+    if ( $Version ) {
+
+        $ENV:H1CRACVERSION = $Version
+        Write-Verbose "Установлена версия платформы $ENV:H1CRACVERSION для использования rac.exe"
+
+    } else {
+
+        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true        
+
+    }
+
+    $ENV:H1CRACVERSION
+    
+}
+
+
+<#
+.SYNOPSIS
+    Производит вызов rac.exe (предварительно производится поиск приложения)
+#>
+function Invoke-RAC {
+    
+    param (
+        # Режим запуска клиента администрирования
+        [Parameter(Mandatory=$true, Position = 0)]
+        [ValidateSet('help', 'agent', 'cluster','manager','server','process','service','infobase','connection','session','lock','rule','profile','counter','limit')]
+        [string]$Mode,
+
+        # Список параметров для указанного режима rac.exe
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string]$ArumentList,
+
+        # Если не нужно вызывать rac.exe
+        [switch]$DoNotInvokeEXE
+    )
+
+    
+    $racArgumentList = $Mode + ' ' + $ArumentList
+
+    if ( -not $ENV:H1CRACPATH -or ( $ENV:H1CRACVERSION -and -not $ENV:H1CRACPATH.Contains($Version) ) ) {
+
+        # Поиск подходящей версии приложения
+
+        $possibleAppDirs = if ( $ENV:H1CAPPDIRS ) { $ENV:H1CAPPDIRS.Split(';') } else { (Get-1CAppDirs).Split(';') }
+
+        if ( $ENV:H1CRACVERSION ) {
+
+            $possibleAppDirs = $possibleAppDirs | Where-Object { $_.Contains( $ENV:H1CRACVERSION ) }
+
+        }
+
+        $foundFiles = Get-ChildItem -File -Filter 'rac.exe' -Path $possibleAppDirs
+
+        if ( $foundFiles ) {
+
+            [regex]$rxVersionNumber = '\d\.\d\.\d+\.\d+'
+
+            $maxVersion = $rxVersionNumber.Matches( $foundFiles.DirectoryName ).Value | Sort-Object -Descending | Select-Object -First 1
+
+            if ( -not $ENV:H1CRACVERSION) {
+
+                $ENV:H1CRACVERSION = $maxVersion
+                Write-Verbose "Установлена версия платформы $ENV:H1CRACVERSION для использования rac.exe"
+
+            }
+
+            $ENV:H1CRACPATH = ( $foundFiles | Where-Object { $_.DirectoryName.Contains($maxVersion) } | Select-Object -First 1 ).FullName
+
+        }
+
+    }
+    
+    if ( -not $DoNotInvokeEXE -and $ENV:H1CRACPATH ) {
+    
+        Start-Process -FilePath $ENV:H1CRACPATH -ArgumentList $racArgumentList -Wait -NoNewWindow
+    
+    } elseif ( -not $DoNotInvokeEXE ) {
+        
+        $errorMessage = 'Не удалось найти исполняемый файл клиента сервера удалённого администрирования rac.exe (заполните переменную окружения $ENV:H1CRACPATH)'
+        
+        if ( $ENV:H1CRACVERSION ) {
+
+            $errorMessage += " для версии платформы $ENV:H1CRACVERSION"
+
+        }
+        
+        Write-Error $errorMessage
+
+    }
+
+}
+
+
+function Get-1CHostData {
+
+    param (
+
+        [string]$ComputerName
+
+    )
+    
+    @{
+        'CIMAgentPs' = Get-CimInstance -ClassName Win32_Process -Filter "Name='ragent.exe'" -Property * -ComputerName:$ComputerName; 
+        'CIMAgentSvc' = Get-CimInstance -ClassName Win32_Service -Filter "PathName like '%ragent.exe%'" -Property * -ComputerName:$ComputerName; 
+        'CIMConfPs' = Get-CimInstance -ClassName Win32_Process -Filter "Name='crserver.exe'" -Property * -ComputerName:$ComputerName; 
+        'CIMConfSvc' = Get-CimInstance -ClassName Win32_Service -Filter "PathName like '%crserver.exe%'" -Property * -ComputerName:$ComputerName; 
+        'CIMMngrPs' = Get-CimInstance -ClassName Win32_Process -Filter "Name='rmngr.exe'" -Property * -ComputerName:$ComputerName; 
+        'CIMMngrSvc' = Get-CimInstance -ClassName Win32_Service -Filter "PathName like '%rmngr.exe%'" -Property * -ComputerName:$ComputerName;  
+        'CIMRasPs' = Get-CimInstance -ClassName Win32_Process -Filter "Name='ras.exe'" -Property * -ComputerName:$ComputerName; 
+        'CIMRasSvc' = Get-CimInstance -ClassName Win32_Service -Filter "PathName like '%ras.exe%'" -Property * -ComputerName:$ComputerName;
+    }
+
+}
+
+
 <#
 .SYNOPSIS
     Удаляет сеанс с кластера 1с
@@ -1995,7 +2233,7 @@ function Find-1CApplicationForExportImport
     [CmdletBinding()]
     Param(
         
-    # Имя компьютера для поиска версии
+        # Имя компьютера для поиска версии
         [string]$ComputerName,
 
         # Вывести все результаты
@@ -3456,4 +3694,6 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport
+Set-Alias -Name rac -Value Invoke-RAC -Description 'Клиент сервера администрирования 1С' -Scope Global
+
+Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion

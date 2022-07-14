@@ -1908,6 +1908,7 @@ function Get-1CAppDirs {
     Установить используемую версию платформы для rac.exe на время сеанса
 #>
 function Set-RACversion {
+    [CmdletBinding()]
     param (
         # Номер версии платформы
         [ValidateScript({ $_ -match '\d\.\d\.\d+\.\d+' })]
@@ -1935,7 +1936,8 @@ function Set-RACversion {
     Производит вызов rac.exe (предварительно производится поиск приложения)
 #>
 function Invoke-RAC {
-    
+
+    [CmdletBinding()]
     param (
         # Режим запуска клиента администрирования
         [Parameter(Mandatory=$true, Position = 0)]

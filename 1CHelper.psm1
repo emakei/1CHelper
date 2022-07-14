@@ -1903,6 +1903,44 @@ function Get-1CAppDirs {
 
 }
 
+
+function Invoke-RAS {
+    [CmdletBinding()]
+    param (
+        # Режим запуска клиента администрирования
+        [Parameter(Position = 0)]
+        [string]$Mode = 'cluster',
+
+        # Список параметров для указанного режима rac.exe
+        [Parameter(ValueFromRemainingArguments = $true)]
+        [string]$ArumentList
+    )
+
+    if ( -not $ENV:H1CRASPATH -or ( $ENV:H1CRASVERSION -and $ENV:H1CRASPATH.Contains($ENV:H1CRASVERSION) )) {
+        Set-RASversion | Out-Null
+    }
+    
+    if ( $ENV:H1CRASPATH ) {
+    
+        Start-Process -FilePath $ENV:H1CRASPATH -ArgumentList ( $Mode += ' ' + $ArgumentList ) -Wait -NoNewWindow -Verbose:$VerbosePreference
+    
+    } else {
+        
+        $errorMessage = 'Не удалось найти исполняемый файл клиента сервера удалённого администрирования ras.exe (заполните переменную окружения $ENV:H1CRASPATH)'
+        
+        if ( $ENV:H1CRACVERSION ) {
+
+            $errorMessage += " для версии платформы $ENV:H1CRASVERSION"
+
+        }
+        
+        Write-Error $errorMessage
+
+    }
+
+}
+
+
 <#
 .SYNOPSIS
     Создание нового экземпляра сервиса сервера администрирования 1С
@@ -1964,7 +2002,7 @@ function New-RASservice {
 
         $displayName = "Сервер администрирования 1С:Предприятие $Version"
 
-        $binaryPathName = "${ENV:H1CRASPATH} cluster --service --port=${ServicePort} ${AgentName}:${CtrlPort}"
+        $binaryPathName = "`"${ENV:H1CRASPATH}`" cluster --service --port=${ServicePort} ${AgentName}:${CtrlPort}"
 
         $serviceWMIobject = Get-WmiObject -ClassName Win32_Service -Filter "Name='$serviceName'"
         
@@ -1980,11 +2018,11 @@ function New-RASservice {
 
         }
 
-        Write-Verbose "Добавление сервиса '$serviceName'"
-
         $credential = New-Object System.Management.Automation.PSCredential ($SrvUsrName, $SrvUsrPwd)
 
-        New-Service -Name $serviceName -DisplayName $displayName -Description $displayName -BinaryPathName $binaryPathName -StartupType Automatic -Credential $credential
+        New-Service -Name $serviceName -DisplayName $displayName -Description $displayName -BinaryPathName $binaryPathName -StartupType Automatic -Credential $credential -Verbose:$VerbosePreference
+
+        Start-Service -Name $serviceName -Verbose:$VerbosePreference
 
     } else {
 
@@ -1992,6 +2030,46 @@ function New-RASservice {
 
     }
 
+}
+
+
+<#
+.SYNOPSIS
+    Установить используемую версию платформы для ras.exe на время сеанса
+#>
+function Set-RASversion {
+    [CmdletBinding()]
+    param (
+        # Номер версии платформы
+        [ValidateScript({ $_ -match '\d\.\d\.\d+\.\d+' })]
+        [string]$Version
+    )
+    
+    if ( $Version ) {
+
+        $ENV:H1CRASVERSION = $Version
+        Write-Verbose "Установлена версия платформы $ENV:H1CRASVERSION для использования ras.exe"
+
+    } else {
+
+        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true
+
+        $rasPath = $ENV:H1CRACPATH.Replace('rac.exe', 'ras.exe')
+
+        if ( Test-Path $rasPath ) {
+            
+            $ENV:H1CRASPATH = $rasPath
+            
+            [regex]$rxVersionNumber = '\d\.\d\.\d+\.\d+'
+
+            $ENV:H1CRASVERSION = $rxVersionNumber.Matches( $rasPath ).Value | Sort-Object -Descending | Select-Object -First 1
+
+        }
+
+    }
+
+    $ENV:H1CRASVERSION
+    
 }
 
 
@@ -2014,7 +2092,7 @@ function Set-RACversion {
 
     } else {
 
-        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true        
+        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true
 
     }
 
@@ -3790,4 +3868,4 @@ https://github.com/zbx-sadman
 
 Set-Alias -Name rac -Value Invoke-RAC -Description 'Клиент сервера администрирования 1С' -Scope Global
 
-Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion, New-RASservice 
+Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion, New-RASservice, Set-RASversion, Invoke-RAS

@@ -1905,6 +1905,98 @@ function Get-1CAppDirs {
 
 <#
 .SYNOPSIS
+    Создание нового экземпляра сервиса сервера администрирования 1С
+
+.EXAMPLE
+    $user = 'root'
+    $pwd = Read-Host -AsSecureString
+    New-RASservice 8.3.17.2171 $user $pwd
+#>
+function New-RASservice {
+    
+    [CmdletBinding()]
+    param (
+
+        # Версия платформы
+        [Parameter(Mandatory=$true, Position=0)]
+        [ValidateScript({ $_ -match '\d\.\d\.\d+\.\d+' })]
+        [string]$Version,
+
+        [Parameter(Mandatory=$true, Position=1)]
+        [string]$SrvUsrName,
+
+        [Parameter(Mandatory=$true, Position=2)]
+        [System.Security.SecureString]$SrvUsrPwd,
+
+        # Адрес агента сервера
+        [Parameter(Position=3)]
+        [string]$AgentName = 'localhost',
+
+        [ValidateScript({ $_ -match '\d{4,5}' })]
+        [string]$CtrlPort = '1540',
+
+        [ValidateScript({ $_ -match '\d{4,5}' })]
+        [string]$ServicePort = '1545',
+
+        # Путь к файлу ras.exe (только если требуется использовать определённый файл)
+        [ValidateScript({ Test-Path $_  })]
+        [string]$FilePath
+
+    )
+    
+    if ( -not $FilePath ) {
+
+        $possibleDirs = ( Get-1CAppDirs -Version:$Version ).split(';')
+
+        $rasFileInfo = Get-ChildItem -File -Path $possibleDirs -Filter ras.exe | Select-Object -First 1
+
+    } else {
+
+        $rasFileInfo = Get-ChildItem -LiteralPath $FilePath
+
+    }
+
+    if ( $rasFileInfo ) {
+
+        $ENV:H1CRASPATH = $rasFileInfo.FullName
+
+        $serviceName = "1C:Enterprise $Version Remote Server"  
+
+        $displayName = "Сервер администрирования 1С:Предприятие $Version"
+
+        $binaryPathName = "${ENV:H1CRASPATH} cluster --service --port=${ServicePort} ${AgentName}:${CtrlPort}"
+
+        $serviceWMIobject = Get-WmiObject -ClassName Win32_Service -Filter "Name='$serviceName'"
+        
+        if ( $serviceWMIobject ) {
+            
+            Write-Verbose "Остановка сервиса '$serviceName'"
+            
+            $serviceWMIobject.StopService() | Out-Null
+            
+            Write-Verbose "Удаление сервиса '$serviceName'"
+            
+            $serviceWMIobject.Delete() | Out-Null
+
+        }
+
+        Write-Verbose "Добавление сервиса '$serviceName'"
+
+        $credential = New-Object System.Management.Automation.PSCredential ($SrvUsrName, $SrvUsrPwd)
+
+        New-Service -Name $serviceName -DisplayName $displayName -Description $displayName -BinaryPathName $binaryPathName -StartupType Automatic -Credential $credential
+
+    } else {
+
+        Write-Error "Не удалось найти ras.exe для версии платформы $Version"
+
+    }
+
+}
+
+
+<#
+.SYNOPSIS
     Установить используемую версию платформы для rac.exe на время сеанса
 #>
 function Set-RACversion {
@@ -3698,4 +3790,4 @@ https://github.com/zbx-sadman
 
 Set-Alias -Name rac -Value Invoke-RAC -Description 'Клиент сервера администрирования 1С' -Scope Global
 
-Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion
+Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion, New-RASservice 

@@ -251,6 +251,148 @@ function Get-1CTechJournalData
    
 }
 
+
+<#
+.SYNOPSIS
+    Возвращает данные счётчиков производительности (рекомендуемые в методическом пособии по эксплуатации крупных информационных систем на платформе 1С:Предприятие 8)
+    см. также https://docs.microsoft.com/en-us/troubleshoot/sql/performance/troubleshoot-sql-io-performance#graphical-representation-of-the-methodology
+#>
+function Get-PerfCounters {
+    
+    param (
+
+        # Имя компьютера(-ов) для сбора данных счётчиков производительности
+        [string[]]$ComputerName,
+
+        # Продолжать непрерывно (пока явно не будет отменено Ctrl+C)
+        [switch]$Continuous,
+
+        # Определяет количество замеров для каждого из счётчиков до остановки сбора данных
+        [int64]$MaxSamples,
+
+        # Определяет интервал времени между замерами в секундах
+        [int32]$SampleInterval = 1,
+
+        # Получить данные всех рекомендуемых счетчиков производительности (из методического пособия по эксплуатации крупных инф. систем)
+        [switch]$AllRecomended,
+
+        # Получить данные счетчиков производительности памяти
+        [switch]$Memory,
+
+        # Получить данные счетчиков производительности логических дисков
+        [switch]$LogicalDisk,
+
+        # Получить данные счетчиков производительности процессора
+        [switch]$Processor,
+
+        # Получить данные счетчиков производительности сетевых интерфейсов
+        [switch]$NetworkInterface,
+
+        # Получить данные счетчиков производительности физических дисков
+        [switch]$PhysicalDisk,
+
+        # Получить данные счетчиков производительности файла подкачки
+        [switch]$PagingFile,
+
+        # Получить данные счетчиков производительности SQL сервера
+        [switch]$SQLServer
+
+    )
+
+    $counters = @()
+    
+    if ( $Memory -or $AllRecomended ) {
+        
+        $counters += '\Memory\Available Mbytes'
+        $counters += '\Memory\Pages/sec'
+
+    }
+
+    if ( $LogicalDisk -or $AllRecomended ) {
+
+        $counters += '\LogicalDisk(_Total)\Free Megabytes'
+        $counters += '\LogicalDisk(*)\% Disk Time'
+        $counters += '\LogicalDisk(*)\% Idle Time' 
+        $counters += '\LogicalDisk(*)\% Disk Write Time'
+        $counters += '\LogicalDisk(*)\% Disk Read Time'
+    }
+
+    if ( $Processor -or $AllRecomended ) {
+
+        $counters += '\Processor(_Total)\% Processor Time'
+        $counters += '\System\Processor Queue Length'
+
+    }
+
+    if ( $PhysicalDisk -or $AllRecomended ) {
+        
+        $counters += '\PhysicalDisk(_Total)\Avg. Disk Queue Length'
+        $counters += '\PhysicalDisk(*)\Avg. Disk Queue Length'
+        $counters += '\PhysicalDisk(_Total)\Avg. Disk sec/Read'
+        $counters += '\PhysicalDisk(_Total)\Avg. Disk sec/Write'
+        $counters += '\PhysicalDisk(*)\% Disk Time'
+        $counters += '\PhysicalDisk(*)\% Idle Time'
+        $counters += '\PhysicalDisk(*)\% Disk Write Time'
+        $counters += '\PhysicalDisk(*)\% Disk Read Time'
+
+    }
+
+    if ( $PagingFile ) {
+
+        $counters += '\Paging File(_Total)\*'
+
+    }
+
+    if ( $SQLServer ) {
+
+        $counters += '\SQLServer:Access Methods\Full Scans/sec'
+        $counters += '\SQLServer:Buffer Manager\Buffer cache hit ratio'
+        $counters += '\SQLServer:Buffer Manager\Free list stalls/sec'
+        $counters += '\SQLServer:Buffer Manager\Lazy writes/sec'
+        $counters += '\SQLServer:Buffer Manager\Page life expectancy'
+        $counters += '\SQLServer:Databases(_Total)\Active Transactions'
+        $counters += '\SQLServer:Databases(_Total)\Transactions/sec'
+        $counters += '\SQLServer:General Statistics\Active Temp Tables'
+        $counters += '\SQLServer:General Statistics\Transactions' 
+        $counters += '\SQLServer:Locks(_Total)\Average Wait Time (ms)'
+        $counters += '\SQLServer:Locks(_Total)\Lock Requests/sec'
+        $counters += '\SQLServer:Locks(_Total)\Lock Timeouts (timeout > 0)/sec'
+        $counters += '\SQLServer:Locks(_Total)\Lock Timeouts/sec'
+        $counters += '\SQLServer:Locks(_Total)\Lock Wait Time (ms)'
+        $counters += '\SQLServer:Locks(_Total)\Lock Waits/sec'
+        $counters += '\SQLServer:Locks(_Total)\Number of Deadlocks/sec'
+        $counters += '\SQLServer:Memory Manager\Memory Grants Pending'
+        $counters += '\SQLServer:Wait Statistics(*)\Lock waits'
+        $counters += '\SQLServer:Wait Statistics(*)\Log buffer waits'
+        $counters += '\SQLServer:Wait Statistics(*)\Log write waits'
+        $counters += '\SQLServer:Wait Statistics(*)\Network IO waits'
+        $counters += '\SQLServer:Wait Statistics(*)\Non-Page latch waits'
+        $counters += '\SQLServer:Wait Statistics(*)\Page IO latch waits'
+        $counters += '\SQLServer:Wait Statistics(*)\Page latch waits'
+
+    }
+
+    $parameters = @{ Counter = $counters }
+
+    if ( $ComputerName ) {
+        $parameters['ComputerName'] = $ComputerName
+    }
+
+    if ( $MaxSamples ) {
+        $parameters['MaxSamples'] = $MaxSamples
+    }
+
+    if ( $Continuous ) {
+        $parameters['Continuous'] = $Continuous
+    }
+
+    # Get-Counter -Counter $counters -MaxSamples:$MaxSamples -Continuous:$Continuous -ComputerName:$ComputerName -SampleInterval:$SampleInterval
+
+    Get-Counter @parameters
+
+}
+
+
 <#
 .SYNOPSIS
    Удаление неиспользуемых объектов конфигурации
@@ -3866,6 +4008,7 @@ function Invoke-UsbHasp
 https://github.com/zbx-sadman
 #>
 
-Set-Alias -Name rac -Value Invoke-RAC -Description 'Клиент сервера администрирования 1С' -Scope Global
+Set-Alias -Name rac -Value Invoke-RAC -Description 'Клиент сервера администрирования 1С:Предприятие 8.3' -Scope Global
+Set-Alias -Name ras -Value Invoke-RAS -Description "Сервер администрирования 1С:Предприятие 8.3" -Scope Global
 
-Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion, New-RASservice, Set-RASversion, Invoke-RAS
+Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion, New-RASservice, Set-RASversion, Invoke-RAS, Get-PerfCounters

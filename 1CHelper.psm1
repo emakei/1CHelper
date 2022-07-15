@@ -2057,12 +2057,12 @@ function Invoke-RAS {
     )
 
     if ( -not $ENV:H1CRASPATH -or ( $ENV:H1CRASVERSION -and $ENV:H1CRASPATH.Contains($ENV:H1CRASVERSION) )) {
-        Set-RASversion | Out-Null
+        Set-RASversion -Verbose:$VerbosePreference | Out-Null
     }
     
     if ( $ENV:H1CRASPATH ) {
     
-        Start-Process -FilePath $ENV:H1CRASPATH -ArgumentList ( $Mode += ' ' + $ArgumentList ) -Wait -NoNewWindow -Verbose:$VerbosePreference
+        Start-Process -FilePath $ENV:H1CRASPATH -ArgumentList "$Mode $ArgumentList" -Wait -NoNewWindow -Verbose:$VerbosePreference
     
     } else {
         
@@ -2192,7 +2192,7 @@ function Set-RASversion {
 
     } else {
 
-        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true
+        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true -Verbose:$VerbosePreference 
 
         $rasPath = $ENV:H1CRACPATH.Replace('rac.exe', 'ras.exe')
 
@@ -2232,7 +2232,7 @@ function Set-RACversion {
 
     } else {
 
-        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true
+        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true -Verbose:$VerbosePreference 
 
     }
 
@@ -2255,15 +2255,12 @@ function Invoke-RAC {
         [string]$Mode,
 
         # Список параметров для указанного режима rac.exe
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [string]$ArumentList,
+        [Parameter(ValueFromRemainingArguments=$true)]
+        [string]$ArgumentList,
 
         # Если не нужно вызывать rac.exe
         [switch]$DoNotInvokeEXE
     )
-
-    
-    $racArgumentList = $Mode + ' ' + $ArumentList
 
     if ( -not $ENV:H1CRACPATH -or ( $ENV:H1CRACVERSION -and -not $ENV:H1CRACPATH.Contains($Version) ) ) {
 
@@ -2300,7 +2297,11 @@ function Invoke-RAC {
     
     if ( -not $DoNotInvokeEXE -and $ENV:H1CRACPATH ) {
     
-        Start-Process -FilePath $ENV:H1CRACPATH -ArgumentList $racArgumentList -Wait -NoNewWindow
+        $racArgumentList = "$Mode $ArgumentList"
+            
+        Write-Verbose "Запуск `"$ENV:H1CRACPATH $racArgumentList`""
+
+        Start-Process -FilePath $ENV:H1CRACPATH -ArgumentList "$Mode $racArgumentList" -Wait -NoNewWindow -Verbose:$VerbosePreference 
     
     } elseif ( -not $DoNotInvokeEXE ) {
         

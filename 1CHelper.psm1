@@ -372,7 +372,7 @@ function Get-PerfCounters {
 
     }
 
-    $parameters = @{ Counter = $counters }
+    $parameters = @{ Counter = $counters; SampeInterval = $SampleInterval }
 
     if ( $ComputerName ) {
         $parameters['ComputerName'] = $ComputerName

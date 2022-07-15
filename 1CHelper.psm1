@@ -386,8 +386,6 @@ function Get-PerfCounters {
         $parameters['Continuous'] = $Continuous
     }
 
-    # Get-Counter -Counter $counters -MaxSamples:$MaxSamples -Continuous:$Continuous -ComputerName:$ComputerName -SampleInterval:$SampleInterval
-
     Get-Counter @parameters
 
 }

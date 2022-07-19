@@ -2047,10 +2047,6 @@ function Get-1CAppDirs {
 function Invoke-RAS {
     [CmdletBinding()]
     param (
-        # Режим запуска клиента администрирования
-        [Parameter(Position = 0)]
-        [string]$Mode = 'cluster',
-
         # Список параметров для указанного режима rac.exe
         [Parameter(ValueFromRemainingArguments = $true)]
         [string]$ArumentList
@@ -2062,7 +2058,8 @@ function Invoke-RAS {
     
     if ( $ENV:H1CRASPATH ) {
     
-        Start-Process -FilePath $ENV:H1CRASPATH -ArgumentList "$Mode $ArgumentList" -Wait -NoNewWindow -Verbose:$VerbosePreference
+        Write-Verbose "Запуск '`"$ENV:H1CRASPATH`" $ArgumentList'"
+        Start-Process -FilePath $ENV:H1CRASPATH -ArgumentList $ArgumentList -Wait -NoNewWindow -Verbose:$VerbosePreference
     
     } else {
         
@@ -2244,16 +2241,12 @@ function Set-RACversion {
 <#
 .SYNOPSIS
     Производит вызов rac.exe (предварительно производится поиск приложения)
+    При обращении к серверу следует указывать имя сервера первым аргументом
 #>
 function Invoke-RAC {
 
     [CmdletBinding()]
     param (
-        # Режим запуска клиента администрирования
-        [Parameter(Mandatory=$true, Position = 0)]
-        [ValidateSet('help', 'agent', 'cluster','manager','server','process','service','infobase','connection','session','lock','rule','profile','counter','limit')]
-        [string]$Mode,
-
         # Список параметров для указанного режима rac.exe
         [Parameter(ValueFromRemainingArguments=$true)]
         [string]$ArgumentList,
@@ -2296,12 +2289,10 @@ function Invoke-RAC {
     }
     
     if ( -not $DoNotInvokeEXE -and $ENV:H1CRACPATH ) {
-    
-        $racArgumentList = "$Mode $ArgumentList"
             
-        Write-Verbose "Запуск `"$ENV:H1CRACPATH $racArgumentList`""
+        Write-Verbose "Запуск '`"$ENV:H1CRACPATH`" $ArgumentList'"
 
-        Start-Process -FilePath $ENV:H1CRACPATH -ArgumentList "$Mode $racArgumentList" -Wait -NoNewWindow -Verbose:$VerbosePreference 
+        Start-Process -FilePath $ENV:H1CRACPATH -ArgumentList $ArgumentList -Wait -NoNewWindow -Verbose:$VerbosePreference 
     
     } elseif ( -not $DoNotInvokeEXE ) {
         

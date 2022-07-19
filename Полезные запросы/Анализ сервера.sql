@@ -395,3 +395,31 @@ from sys.dm_tran_active_snapshot_database_transactions
 order by elapsed_time_seconds desc
 go
 -- end
+
+
+-- Оценить наличие и величину ожидания при синхронизации потоков выполнения
+with waits
+            as
+            (
+            select
+                   wait_type,
+                   wait_time_ms,
+                   waiting_tasks_count
+            from sys.dm_os_wait_stats
+            )
+            select
+                   waits.wait_type Wait_type,
+                   waits.waiting_tasks_count Waiting_tasks,
+                   waits.wait_time_ms Wait_time,
+                   100 * waits.wait_time_ms / Totals.Total Percentage
+            from waits
+            inner join
+                         (
+                         select
+                                sum (waits.wait_time_ms) Total
+                         from waits
+                         ) Totals
+            on 1=1
+            where waits.wait_type = N'CXPACKET'
+go
+-- end

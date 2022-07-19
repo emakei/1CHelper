@@ -2048,6 +2048,7 @@ function Invoke-RAS {
     [CmdletBinding()]
     param (
         # Список параметров для ras.exe
+        [Parameter(ValueFromRemainingArguments = $true)]
         [string]$ArgumentList = 'help'
     )
 
@@ -2247,6 +2248,7 @@ function Invoke-RAC {
     [CmdletBinding()]
     param (
         # Список параметров для rac.exe
+        [Parameter(ValueFromRemainingArguments = $true)]
         [string]$ArgumentList = 'help',
 
         # Если не нужно вызывать rac.exe

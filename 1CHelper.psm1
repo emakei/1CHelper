@@ -2047,9 +2047,8 @@ function Get-1CAppDirs {
 function Invoke-RAS {
     [CmdletBinding()]
     param (
-        # Список параметров для указанного режима rac.exe
-        [Parameter(ValueFromRemainingArguments = $true)]
-        [string]$ArumentList
+        # Список параметров для ras.exe
+        [string]$ArgumentList = 'help'
     )
 
     if ( -not $ENV:H1CRASPATH -or ( $ENV:H1CRASVERSION -and $ENV:H1CRASPATH.Contains($ENV:H1CRASVERSION) )) {
@@ -2189,7 +2188,7 @@ function Set-RASversion {
 
     } else {
 
-        Invoke-RAC -Mode 'help' -DoNotInvokeEXE:$true -Verbose:$VerbosePreference 
+        Invoke-RAC -DoNotInvokeEXE:$true -Verbose:$VerbosePreference 
 
         $rasPath = $ENV:H1CRACPATH.Replace('rac.exe', 'ras.exe')
 
@@ -2247,9 +2246,8 @@ function Invoke-RAC {
 
     [CmdletBinding()]
     param (
-        # Список параметров для указанного режима rac.exe
-        [Parameter(ValueFromRemainingArguments=$true)]
-        [string]$ArgumentList,
+        # Список параметров для rac.exe
+        [string]$ArgumentList = 'help',
 
         # Если не нужно вызывать rac.exe
         [switch]$DoNotInvokeEXE

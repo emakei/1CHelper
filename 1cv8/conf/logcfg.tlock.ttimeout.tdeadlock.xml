@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns="http://v8.1c.ru/v8/tech-log">
+<dump create="true" location="C:\dumps" type="0" prntscrn="true"/>
+<log location="C:\logs\tlock" history="48">
+  <event>
+    <eq property="Name" value="TLOCK"/>
+  </event>
+  <event>
+    <eq property="Name" value="TTIMEOUT"/>
+  </event>
+  <event>
+    <eq property="Name" value="TDEADLOCK"/>
+  </event>
+  <property name="all"/>
+</log>
+</config>

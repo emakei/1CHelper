@@ -1,4 +1,51 @@
-﻿<#
+﻿
+#region DiskSpd
+<#
+    Работа с утилитой анализа производительности дисков. Подробнее по ссылке
+    https://docs.microsoft.com/en-us/azure-stack/hci/manage/diskspd-overview
+#>
+
+<#
+.SYNOPSIS
+    Командлет загрузки файлов DiskSpd для анализа производительности дисковой подсистемы
+    
+#>
+function Get-DiskSpdFromGitHub {
+    
+    [CmdletBinding()]
+    param (
+        [string]$DestinationPath = "$pwd",
+        [switch]$DoNotExpandArchive,
+        [switch]$DoNotDownloadProcessScript
+    )
+    
+    $client = New-Object System.Net.WebClient -Verbose:$VerbosePreference
+
+    $diskSpdArchivePath = "${DestinationPath}\DiskSpd_latest.zip"
+    $diskSpdUrl = "https://github.com/Microsoft/diskspd/releases/latest/download/DiskSpd.zip"
+
+    Write-Verbose "Загрузка файла $diskSpdUrl в $diskSpdArchivePath"
+    $client.DownloadFile($diskSpdUrl, $diskSpdArchivePath)
+
+    if ( -not $DoNotExpandArchive ) {
+        Expand-Archive -LiteralPath:$diskSpdArchivePath -DestinationPath:$DestinationPath -Verbose:$VerbosePreference
+    }
+
+    if ( -not $DoNotDownloadProcessScript ) {
+
+        $processScriptUrl = "https://raw.githubusercontent.com/microsoft/diskspd/master/Process-DiskSpd.ps1"
+        $processScriptDestinationPath = "${DestinationPath}\Process-DiskSpd.ps1"
+
+        Write-Verbose "Загрузка файла $processScriptUrl в $processScriptDestinationPath"
+        $client.DownloadFile($processScriptUrl, $processScriptDestinationPath)
+
+    }
+
+}
+
+#endregion
+
+<#
 .Synopsis
    Очистка временных каталогов 1С
 .DESCRIPTION
@@ -3330,10 +3377,8 @@ where not t1.program_name is null
     }
 }
 
-
-<# BEGIN
-https://github.com/zbx-sadman
-#>
+#region Zabbix
+# https://github.com/zbx-sadman
 
 #
 #  Select object with Property that equal Value if its given or with Any Property in another case
@@ -4062,11 +4107,10 @@ function Invoke-UsbHasp
     $Result;
 }
 
-<# END
-https://github.com/zbx-sadman
-#>
+# https://github.com/zbx-sadman
+#endregion
 
 Set-Alias -Name rac -Value Invoke-RAC -Description 'Клиент сервера администрирования 1С:Предприятие 8.3' -Scope Global
 Set-Alias -Name ras -Value Invoke-RAS -Description "Сервер администрирования 1С:Предприятие 8.3" -Scope Global
 
-Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion, New-RASservice, Set-RASversion, Invoke-RAS, Get-PerfCounters
+Export-ModuleMember Remove-1CNotUsedObjects, Find-1CEstart, Find-1C8conn, Get-1ClusterData, Get-1CNetHaspIniStrings, Invoke-NetHasp, Invoke-UsbHasp, Remove-1CSession, Invoke-SqlQuery, Get-1CTechJournalData, Get-1CAPDEXinfo, Get-1CTechJournalLOGtable, Remove-1CTempDirs, Find-1CApplicationForExportImport, Get-1CHostData, Invoke-RAC, Get-1CAppDirs, Get-1CRegisteredApplicationClasses, Set-RACversion, New-RASservice, Set-RASversion, Invoke-RAS, Get-PerfCounters, Get-DiskSpdFromGitHub

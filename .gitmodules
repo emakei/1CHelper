@@ -1,6 +1,3 @@
-[submodule "sql-server-maintenance-solution"]
-	path = sql-server-maintenance-solution
-	url = https://github.com/olahallengren/sql-server-maintenance-solution.git
 [submodule "diskspd"]
 	path = diskspd
 	url = https://github.com/microsoft/diskspd

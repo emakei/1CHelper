@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<config xmlns="http://v8.1c.ru/v8/tech-log">
+  <log location="C:\Program Files (x86)\1cv8\logs" history="168">
+    <event>
+      <eq property="Name" value="PROC"/>
+    </event>
+    <event>
+      <eq property="Name" value="SCOM"/>
+    </event>
+    <event>
+      <eq property="Name" value="CONN"/>
+    </event>
+    <event>
+      <eq property="Name" value="EXCP"/>
+    </event>
+    <event>
+      <eq property="Name" value="ADMIN"/>
+    </event>
+    <event>
+      <eq property="Name" value="QERR"/>
+    </event>
+    <property name="all"></property>
+  </log>
+</config>

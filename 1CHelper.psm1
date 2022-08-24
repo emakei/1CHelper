@@ -141,12 +141,12 @@ function Get-1CTechJournalLOGtable
     Process
     {
 
-    Get-ChildItem $fileName -Recurse -File | ForEach-Object {
+    Get-ChildItem -Path $fileName -Recurse -File | ForEach-Object {
         Write-Verbose $_.FullName
         $creationTime = $_.CreationTime
         $processName = $_.Directory.Name.Split('_')[0]
         $processID = $_.Directory.Name.Split('_')[1]
-        Get-TechJournalData $_.FullName | ForEach-Object {
+        Get-1CTechJournalData $_.FullName | ForEach-Object {
             $timeValue = $_.Groups['time'].Value
             $errorTime = $creationTime.AddMinutes($timeValue.Substring(0,2)).AddSeconds($timeValue.Substring(3,2))
             $duration = $timeValue.Split('-')[1]

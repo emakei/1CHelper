@@ -269,7 +269,7 @@ function Get-1CTechJournalData
         [Parameter(Mandatory=$true,
                    ValueFromPipelineByPropertyName=$true,
                    Position=0)]
-        $fileName
+        $path
     )
 
     Begin {
@@ -282,7 +282,7 @@ function Get-1CTechJournalData
     }
 
     Process {
-        Get-ChildItem $fileName -Recurse -File | ForEach-Object {
+        Get-ChildItem $path -Recurse -File | ForEach-Object {
             Write-Verbose $_.FullName
             $rawText = Get-Content $_.FullName -Encoding UTF8 -Raw
             if ($rawText) {

@@ -1,7 +1,7 @@
 # Get-WindowsCapability -Name RSAT* -Online | Add-WindowsCapability -Online
 # Get-CimClass -Namespace root/CIMV2 | Where-Object CimClassName -Like Win32* | Select-Object CimClassName | Sort-Object -Property CimClassName
 
-Set-PSReadLineOption -EditMode Vi -ViModeIndicator Prompt
+Set-PSReadLineOption -EditMode Emacs
 
 ## Map PSDrives to other registry hives
 if (!(Test-Path HKCR:)) {
@@ -23,10 +23,6 @@ function prompt {
     $prefix + $body + $suffix
 }
 
-Set-PSReadLineKeyHandler -Chord 'Ctrl+p' -Function PreviousHistory
-Set-PSReadLineKeyHandler -Chord 'Ctrl+n' -Function NextHistory
-Set-PSReadLineKeyHandler -Chord 'Ctrl+e' -Function EndOfLine
-Set-PSReadLineKeyHandler -Chord 'Ctrl+a' -Function BeginningOfLine
 Set-PSReadLineKeyHandler -Chord 'Enter' -Function ValidateAndAcceptLine
 
 ## Add argument completer for the dotnet CLI tool

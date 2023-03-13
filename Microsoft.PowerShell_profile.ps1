@@ -1,8 +1,6 @@
 # Get-WindowsCapability -Name RSAT* -Online | Add-WindowsCapability -Online
 # Get-CimClass -Namespace root/CIMV2 | Where-Object CimClassName -Like Win32* | Select-Object CimClassName | Sort-Object -Property CimClassName
 
-Set-PSReadLineOption -EditMode Emacs
-
 ## Map PSDrives to other registry hives
 if (!(Test-Path HKCR:)) {
     $null = New-PSDrive -Name HKCR -PSProvider Registry -Root HKEY_CLASSES_ROOT
